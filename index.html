@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Roseberry Ops</title>
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#1a1714">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<style>
+  /* Mirrors the dashboard's palette so the two don't feel like different
+     products. Dark-first: this is used outdoors and at night more than at a
+     desk, and a dark card is easier on the eyes at 5am. */
+  :root {
+    --bg: #1a1714;
+    --surface: #221e19;
+    --surface-2: #2c2620;
+    --ink: #f3efe7;
+    --ink-2: #c5beb1;
+    --ink-3: #948c7e;
+    --line: rgba(243, 239, 231, 0.12);
+    --accent: #e0623f;
+    --good: #6fae8c;
+    --warn: #d9a544;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: max(16px, env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1 { font-size: 15px; letter-spacing: .12em; text-transform: uppercase;
+       color: var(--ink-3); font-weight: 600; margin: 0 0 16px; }
+  .card { background: var(--surface); border: 1px solid var(--line);
+          border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  label { display: block; font-size: 11px; letter-spacing: .1em;
+          text-transform: uppercase; color: var(--ink-3); margin-bottom: 8px; }
+  input, textarea {
+    width: 100%; background: var(--surface-2); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 6px; padding: 12px;
+    /* 16px minimum stops iOS/Android zooming the page on focus. */
+    font-size: 16px; font-family: inherit; outline: none;
+  }
+  input:focus, textarea:focus { border-color: var(--accent); }
+  textarea { resize: none; }
+  .chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin: 0 -2px; }
+  .chip {
+    flex: 0 0 auto; padding: 10px 14px; border-radius: 6px;
+    border: 1px solid var(--line); background: var(--surface-2);
+    color: var(--ink-2); font-size: 14px; cursor: pointer;
+    /* Big enough to hit with a work glove on. */
+    min-height: 44px;
+  }
+  .chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .field { margin-top: 16px; }
+  button.primary {
+    width: 100%; min-height: 52px; margin-top: 20px; border: none;
+    border-radius: 8px; background: var(--accent); color: #fff;
+    font-size: 16px; font-weight: 600; cursor: pointer;
+  }
+  button.primary:disabled { opacity: .5; }
+  button.ghost {
+    width: 100%; min-height: 48px; border-radius: 8px; cursor: pointer;
+    background: transparent; color: var(--ink-2); border: 1px solid var(--line);
+    font-size: 14px;
+  }
+  .msg { margin-top: 12px; font-size: 14px; min-height: 20px; }
+  .msg.ok { color: var(--good); }
+  .msg.err { color: var(--accent); }
+  .hint { font-size: 12px; color: var(--ink-3); margin-top: 8px; }
+  .row { display: flex; gap: 8px; }
+  .row > * { flex: 1; }
+  .hidden { display: none !important; }
+  .task { padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 15px; }
+  .task:last-child { border-bottom: none; }
+  .task .meta { font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+  .task.overdue .meta { color: var(--warn); }
+</style>
+</head>
+<body>
+
+<!-- Sign in ------------------------------------------------------------- -->
+<section id="auth" class="card hidden">
+  <h1>Roseberry Ops</h1>
+  <label for="email">Email</label>
+  <!-- Phone keyboards capitalise and autocorrect by default, which silently
+       breaks email sign-in. Same fix as the dashboard's sign-in form. -->
+  <input id="email" type="email" inputmode="email" autocomplete="username"
+         autocapitalize="none" autocorrect="off" spellcheck="false">
+  <div class="field">
+    <label for="password">Password</label>
+    <input id="password" type="password" autocomplete="current-password">
+  </div>
+  <button id="signin" class="primary">Sign in</button>
+  <div id="authMsg" class="msg"></div>
+</section>
+
+<!-- Quick add ----------------------------------------------------------- -->
+<section id="app" class="hidden">
+  <h1>Quick add</h1>
+
+  <div class="card">
+    <textarea id="title" rows="3" placeholder="What needs doing?"
+              autocapitalize="sentences"></textarea>
+
+    <div class="field">
+      <label>Folder</label>
+      <div class="chips" id="folders"></div>
+    </div>
+
+    <div class="field">
+      <label>When</label>
+      <div class="chips" id="whens"></div>
+      <div class="row" style="margin-top:8px">
+        <input id="date" type="date">
+        <input id="time" type="time">
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Priority</label>
+      <div class="chips" id="prios"></div>
+    </div>
+
+    <button id="save" class="primary">Save</button>
+    <div id="saveMsg" class="msg"></div>
+  </div>
+
+  <div class="card">
+    <h1 style="margin-bottom:12px">Due today</h1>
+    <div id="today"><div class="hint">Loading…</div></div>
+  </div>
+
+  <div class="card">
+    <button id="enablePush" class="ghost">Enable notifications</button>
+    <div id="pushMsg" class="msg"></div>
+    <button id="signout" class="ghost" style="margin-top:12px">Sign out</button>
+  </div>
+</section>
+
+<script src="./config.js"></script>
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const cfg = window.OPS_CONFIG;
+const sb = createClient(cfg.supabaseUrl, cfg.supabaseKey);
+
+const $ = (id) => document.getElementById(id);
+const state = { domain: '', date: '', priority: 4, domains: [] };
+
+// ─── Date helpers (phone's own clock — "today" must mean today here) ──────
+const ymd = (d) => {
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${m}-${day}`;
+};
+const addDays = (d, n) => { const c = new Date(d); c.setDate(c.getDate() + n); return c; };
+
+// ─── Chip rendering ──────────────────────────────────────────────────────
+function renderChips(el, options, selected, onPick) {
+  el.innerHTML = '';
+  for (const opt of options) {
+    const b = document.createElement('button');
+    b.className = 'chip';
+    b.type = 'button';
+    b.textContent = opt.label;
+    b.setAttribute('aria-pressed', String(opt.value === selected));
+    b.onclick = () => onPick(opt.value);
+    el.appendChild(b);
+  }
+}
+
+function paintAll() {
+  renderChips($('folders'),
+    [{ value: '', label: 'Inbox' }, ...state.domains.map((d) => ({ value: d.id, label: d.name }))],
+    state.domain, (v) => { state.domain = v; paintAll(); });
+
+  const now = new Date();
+  renderChips($('whens'), [
+    { value: '', label: 'None' },
+    { value: ymd(now), label: 'Today' },
+    { value: ymd(addDays(now, 1)), label: 'Tomorrow' },
+    { value: ymd(addDays(now, (6 - now.getDay() + 7) % 7)), label: 'Weekend' },
+  ], state.date, (v) => { state.date = v; $('date').value = v; if (!v) $('time').value = ''; paintAll(); });
+
+  renderChips($('prios'), [1, 2, 3, 4].map((p) => ({ value: p, label: 'P' + p })),
+    state.priority, (v) => { state.priority = v; paintAll(); });
+}
+
+$('date').onchange = (e) => { state.date = e.target.value; paintAll(); };
+
+// ─── Save ────────────────────────────────────────────────────────────────
+$('save').onclick = async () => {
+  const title = $('title').value.trim();
+  const msg = $('saveMsg');
+  if (!title) { msg.className = 'msg err'; msg.textContent = 'Type something first.'; return; }
+
+  $('save').disabled = true;
+  msg.className = 'msg'; msg.textContent = 'Saving…';
+
+  const time = $('time').value;
+  const row = {
+    title,
+    due_date: state.date || null,
+    due_time: time || null,
+    priority: state.priority,
+    // domain_id is NOT NULL; no folder picked means Inbox.
+    domain_id: state.domain || state.inbox?.id,
+    source: 'manual',
+  };
+
+  const { error } = await sb.from('tasks').insert(row);
+  $('save').disabled = false;
+  if (error) { msg.className = 'msg err'; msg.textContent = error.message; return; }
+
+  msg.className = 'msg ok'; msg.textContent = 'Saved.';
+  $('title').value = '';
+  state.date = ''; state.priority = 4;
+  $('date').value = ''; $('time').value = '';
+  paintAll(); loadToday();
+};
+
+// ─── Today list ──────────────────────────────────────────────────────────
+async function loadToday() {
+  const today = ymd(new Date());
+  const { data, error } = await sb
+    .from('tasks')
+    .select('id, title, due_date, due_time, priority')
+    .eq('status', 'open')
+    .not('due_date', 'is', null)
+    .lte('due_date', today)
+    .order('due_date')
+    .limit(20);
+
+  const el = $('today');
+  if (error) { el.innerHTML = `<div class="hint">${error.message}</div>`; return; }
+  if (!data.length) { el.innerHTML = '<div class="hint">Nothing due. </div>'; return; }
+
+  el.innerHTML = data.map((t) => {
+    const overdue = t.due_date < today;
+    const when = overdue ? `Overdue · ${t.due_date}` : (t.due_time ? t.due_time.slice(0, 5) : 'Today');
+    return `<div class="task ${overdue ? 'overdue' : ''}">${escapeHtml(t.title)}
+              <div class="meta">${when} · P${t.priority}</div></div>`;
+  }).join('');
+}
+
+const escapeHtml = (s) => s.replace(/[&<>"']/g, (c) =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+// ─── Push notifications ──────────────────────────────────────────────────
+// VAPID keys are base64url; the browser wants a Uint8Array.
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+}
+
+$('enablePush').onclick = async () => {
+  const msg = $('pushMsg');
+  if (!cfg.vapidPublicKey) {
+    msg.className = 'msg err';
+    msg.textContent = 'No VAPID public key set in config.js yet.';
+    return;
+  }
+  try {
+    msg.className = 'msg'; msg.textContent = 'Requesting permission…';
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') {
+      msg.className = 'msg err';
+      msg.textContent = 'Permission denied. Enable it in your browser settings for this site.';
+      return;
+    }
+
+    const reg = await navigator.serviceWorker.ready;
+    // An existing subscription is reused; re-subscribing the same device just
+    // upserts by endpoint, so this is safe to press repeatedly.
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(cfg.vapidPublicKey),
+    });
+
+    const json = sub.toJSON();
+    const { error } = await sb.from('push_subscriptions').upsert({
+      endpoint: json.endpoint,
+      p256dh: json.keys.p256dh,
+      auth: json.keys.auth,
+      label: navigator.userAgent.slice(0, 120),
+      failed_at: null,
+    }, { onConflict: 'endpoint' });
+
+    if (error) { msg.className = 'msg err'; msg.textContent = error.message; return; }
+    msg.className = 'msg ok'; msg.textContent = 'Notifications enabled on this device.';
+  } catch (err) {
+    msg.className = 'msg err';
+    msg.textContent = err.message || String(err);
+  }
+};
+
+// ─── Auth ────────────────────────────────────────────────────────────────
+$('signin').onclick = async () => {
+  const msg = $('authMsg');
+  msg.className = 'msg'; msg.textContent = 'Signing in…';
+  const { error } = await sb.auth.signInWithPassword({
+    email: $('email').value.trim(),
+    password: $('password').value,
+  });
+  if (error) { msg.className = 'msg err'; msg.textContent = error.message; return; }
+  boot();
+};
+
+$('signout').onclick = async () => { await sb.auth.signOut(); boot(); };
+
+async function boot() {
+  const { data: { session } } = await sb.auth.getSession();
+  $('auth').classList.toggle('hidden', !!session);
+  $('app').classList.toggle('hidden', !session);
+  if (!session) return;
+
+  const { data } = await sb.from('stewardship_domains').select('id, name, is_system');
+  const all = data ?? [];
+  // Chips show the real folders only; Inbox is rendered separately as the
+  // default option, and kept aside because domain_id is NOT NULL and an
+  // unselected folder has to fall back to something.
+  state.domains = all
+    .filter((d) => !d.is_system)
+    .sort((a, b) => a.name.localeCompare(b.name));
+  state.inbox = all.find((d) => d.is_system) ?? null;
+
+  paintAll();
+  loadToday();
+}
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js');
+}
+boot();
+</script>
+</body>
+</html>
