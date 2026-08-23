@@ -13,5 +13,5 @@ window.OPS_CONFIG = {
   // Paste the PUBLIC half of your VAPID key pair here (see README in this
   // folder for how to generate it). Until it is set, the app still works for
   // quick-add — only the "Enable notifications" button is disabled.
-  vapidPublicKey: 'BA_SE5GzV6auOl_ZmqvhLWIwVjnE975OODb5w7XmMDY344l6RMynRx18VLGpfvRui6HR0_r7z16GRpSh14-jhfY',
+  vapidPublicKey: 'BORUP01cJ-sQH03kaQt2xwUsAbw68lqp4WSgHrT9bmUhIJ2sph8hbayJvKIuDtI2Vlqmy8Nus-bP0SRT8-wXJPU',
 };
