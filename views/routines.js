@@ -201,7 +201,7 @@ export async function routineForm(mount, { id }) {
       el('div', { class: 'field' },
         el('label', { class: 'check' }, activeBox, el('span', {}, 'Active'))),
     ),
-    el('div', { style: 'padding: 0 20px' },
+    el('div', { class: 'form-actions' },
       save,
       isNew ? null : el('button', { class: 'ghost danger', onclick: onDelete }, 'Delete'),
     ),

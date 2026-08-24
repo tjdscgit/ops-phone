@@ -30,9 +30,24 @@ phone and the dashboard are demonstrably the same product:
 deliberate — this gets used outdoors and before dawn. Both palettes are the
 same design, and the toggle is in More → Settings, remembered per device.
 
-Navigation mirrors the dashboard's mobile shell: five tabs (Today, Work,
-Content, People, Library) plus a More bottom sheet, with capture on a floating
-button because it's an action available anywhere rather than a destination.
+## One app, two shapes
+
+There is no separate desktop build. The same files rearrange themselves at
+**800px** — the gate the dashboard uses — so one URL serves both:
+
+- **Narrow (phone).** Five tabs along the bottom (Today, Work, Content,
+  People, Library) plus a More bottom sheet, with capture on a floating
+  button because it's an action available anywhere rather than a destination.
+- **Wide (desktop).** The bottom bar and floating button give way to a 64px
+  icon rail down the left, expanding to 236px on hover to reveal labels. The
+  rail has room for every destination, so the More sheet is not used. Content
+  is capped at 1120px and centred, the display title grows to 40px, and search
+  and filters sit side by side.
+
+This is the pattern Roseberry Planner already uses — one responsive static
+file, installed as an app on the phone and opened in a browser on a laptop.
+It means the desktop needs no hosting, nothing to start, and works from any
+machine, not just the one the repo is checked out on.
 
 ## How it's put together
 

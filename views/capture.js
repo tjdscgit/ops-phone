@@ -98,7 +98,7 @@ export async function captureView(mount) {
       slots.prio,
       slots.folder,
     ),
-    el('div', { style: 'padding: 0 20px' }, save),
+    el('div', { class: 'form-actions' }, save),
     hint('Longer forms with every field live under each section.'),
   );
 

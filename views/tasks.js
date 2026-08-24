@@ -115,7 +115,7 @@ export async function tasksList(mount) {
     body.replaceChildren(
       list,
       data.length >= state.limit
-        ? el('div', { class: 'controls', style: 'padding-top:16px' },
+        ? el('div', { class: 'controls more-row' },
             el('button', { class: 'ghost', onclick: () => { state.limit += 50; load(); } }, 'Load more'))
         : null,
     );
@@ -333,7 +333,7 @@ export async function taskForm(mount, { id }) {
       slots.waitingField,
       el('div', { class: 'field' }, el('label', {}, 'Notes'), notes),
     ),
-    el('div', { style: 'padding: 0 20px' },
+    el('div', { class: 'form-actions' },
       save,
       isNew ? null : el('button', { class: 'ghost danger', onclick: onDelete }, 'Delete'),
     ),

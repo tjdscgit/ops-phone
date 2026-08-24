@@ -381,6 +381,12 @@
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
   }
 
+  /* The rail is the desktop shell only; the media query turns it on. */
+  .rail { display: none; }
+
+  .form-actions { padding: 0 20px; }
+  .controls.more-row { padding-top: 16px; }
+
   /* ── Bottom bar ──────────────────────────────────────────────────────── */
   nav.bar {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
@@ -462,6 +468,116 @@
   @media (prefers-reduced-motion: reduce) {
     .toast, .sheet, .sheet-scrim, .item { transition: none; }
   }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     Desktop shell — 800px and up.
+     The same gate the dashboard uses: below it, a bottom tab bar; above it,
+     an icon rail down the left and a capped content column. One codebase,
+     two shapes, same URL — the pattern Roseberry Planner already uses.
+     ═══════════════════════════════════════════════════════════════════════ */
+  @media (min-width: 800px) {
+    :root { --rail: 64px; --rail-open: 236px; }
+
+    body { padding: 0 0 0 var(--rail); }
+
+    /* The phone's bottom bar and floating button belong to the narrow shell. */
+    nav.bar, .fab { display: none !important; }
+
+    /* ── Rail ──────────────────────────────────────────────────────────── */
+    .rail {
+      position: fixed; inset-block: 0; left: 0; z-index: 40;
+      width: var(--rail);
+      display: flex; flex-direction: column; overflow: hidden;
+      background: var(--surface); border-right: 1px solid var(--line);
+      transition: width 0.2s ease-out;
+    }
+    /* Expands on hover to reveal labels, then collapses again — the content
+       column keeps the collapsed width, so nothing reflows underneath. */
+    .rail:hover, .rail:focus-within { width: var(--rail-open); }
+
+    .rail-head {
+      display: flex; align-items: center; gap: 12px;
+      height: 60px; padding: 0 19px; flex: 0 0 auto;
+      border-bottom: 1px solid var(--line);
+    }
+    .rail-mark {
+      flex: 0 0 auto; width: 26px; height: 26px; border-radius: 5px;
+      display: grid; place-items: center;
+      border: 1px solid var(--line-strong); background: var(--bg);
+      color: var(--accent); font-family: var(--serif); font-size: 18px; line-height: 1;
+    }
+    .rail-name { white-space: nowrap; }
+    .rail-name b {
+      display: block; font-family: var(--serif); font-weight: 500;
+      font-size: 15px; line-height: 1.1; letter-spacing: -0.01em; color: var(--ink);
+    }
+    .rail-name span {
+      display: block; font-family: var(--mono); font-size: 9px; line-height: 1.4;
+      letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3);
+    }
+
+    .rail-items { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 10px 0; }
+    .rail-foot { flex: 0 0 auto; border-top: 1px solid var(--line); padding: 8px 0; }
+
+    .rail-item {
+      position: relative; display: flex; align-items: center; gap: 12px;
+      width: 100%; padding: 9px 21px; border: none; background: none;
+      color: var(--ink-2); cursor: pointer;
+      font-family: var(--sans); font-size: 13.5px; text-align: left;
+      white-space: nowrap; transition: color 0.12s, background 0.12s;
+    }
+    .rail-item:hover { background: var(--hover-wash); color: var(--ink); }
+    .rail-item .glyph {
+      flex: 0 0 22px; display: grid; place-items: center; color: inherit;
+    }
+    /* Labels fade in with the rail rather than appearing mid-slide. */
+    .rail-item .label { opacity: 0; transition: opacity 0.1s; }
+    .rail:hover .rail-item .label,
+    .rail:focus-within .rail-item .label { opacity: 1; }
+
+    .rail-item[aria-current="true"] { color: var(--ink); }
+    .rail-item[aria-current="true"]::before {
+      content: ''; position: absolute; left: 0; top: 8px; bottom: 8px;
+      width: 2px; background: var(--accent);
+    }
+    .rail-item.cta { color: var(--accent); }
+
+    .rail-sep { height: 1px; margin: 8px 21px; background: var(--line); }
+
+    /* ── Content column ────────────────────────────────────────────────── */
+    /* Capped and centred so text lines stay readable on a wide monitor. */
+    main {
+      max-width: 1120px; margin: 0 auto; width: 100%;
+      padding: 0 40px 48px;
+    }
+
+    /* Components carry a 20px gutter for the phone; the column owns spacing
+       here, so that gutter is removed rather than doubled. */
+    .screen-head, .section-label, .controls, .hint, .form-actions { padding-inline: 0; }
+    .item { padding-inline: 0; }
+    .panel { margin-inline: 0; }
+
+    .screen-head { padding-top: 40px; padding-bottom: 24px; }
+    .screen-head h1 { font-size: 40px; }
+    .screen-head .row-actions { align-items: flex-end; }
+    /* Meta sits inline to the right of the title once there's room for it. */
+    .screen-head .meta { margin-top: 0; }
+
+    /* Forms and buttons don't need to be 1120px wide to be usable. */
+    .panel { max-width: 720px; }
+    .form-actions { max-width: 360px; }
+    .controls { max-width: 720px; }
+
+    /* Search and filters sit side by side instead of stacking. */
+    .controls { grid-auto-flow: column; grid-auto-columns: max-content;
+                justify-content: start; align-items: center; gap: 16px; }
+    .controls input[type="search"] { width: 280px; }
+
+    .toast { left: auto; right: 24px; bottom: 24px; max-width: 380px; }
+
+    /* The More sheet is a phone affordance; the rail lists everything. */
+    .sheet, .sheet-scrim { display: none !important; }
+  }
 </style>
 </head>
 <body>
@@ -476,6 +592,8 @@
     <path d="M12 5v14M5 12h14"/>
   </svg>
 </button>
+
+<aside id="rail" class="rail hidden" aria-label="Primary"></aside>
 
 <nav id="nav" class="bar hidden" aria-label="Primary"></nav>
 

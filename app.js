@@ -125,16 +125,94 @@ function buildNav() {
   );
 }
 
+// ─── Desktop rail ────────────────────────────────────────────────────────
+// Above 800px the bottom bar gives way to a rail down the left. There is room
+// for everything there, so the rail lists the five tabs AND what the phone
+// hides behind More — no sheet needed on a desktop.
+
+const RAIL_GLYPHS = {
+  capture: '<path d="M12 5v14M5 12h14"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/>',
+};
+
+function buildRail() {
+  const item = ({ href, label, icon, glyph, cls, onClick }) => {
+    const b = el('button', {
+      class: `rail-item ${cls || ''}`, type: 'button',
+      'data-href': href || null,
+      onclick: onClick || (() => go(href)),
+    });
+    const g = el('span', { class: 'glyph' });
+    g.append(icon ? svg(ICONS[icon], 20) : svg(RAIL_GLYPHS[glyph], 20));
+    b.append(g, el('span', { class: 'label' }, label));
+    return b;
+  };
+
+  $('rail').replaceChildren(
+    el('div', { class: 'rail-head' },
+      el('div', { class: 'rail-mark' }, 'R'),
+      el('div', { class: 'rail-name' },
+        el('b', {}, 'Roseberry'),
+        el('span', {}, 'Ops'),
+      ),
+    ),
+    el('div', { class: 'rail-items' },
+      item({ label: 'Capture', glyph: 'capture', cls: 'cta', onClick: () => go('#/capture') }),
+      el('div', { class: 'rail-sep' }),
+      ...TABS.map((t) => item({ href: t.href, label: t.label, icon: t.icon })),
+      el('div', { class: 'rail-sep' }),
+      ...MORE_ITEMS.filter((m) => m.href !== '#/settings')
+        .map((m) => railGlyphItem(m, item)),
+    ),
+    el('div', { class: 'rail-foot' },
+      item({ href: '#/settings', label: 'Settings', glyph: 'settings' }),
+      el('button', {
+        class: 'rail-item', type: 'button',
+        onclick: async () => { await sb.auth.signOut(); location.reload(); },
+      },
+        el('span', { class: 'glyph' }, '⏻'),
+        el('span', { class: 'label' }, 'Sign out'),
+      ),
+    ),
+  );
+}
+
+// The More items carry a text glyph rather than an SVG; reuse it in the rail
+// so the two shells name things identically.
+function railGlyphItem(m, item) {
+  const b = el('button', {
+    class: 'rail-item', type: 'button', 'data-href': m.href,
+    onclick: () => go(m.href),
+  });
+  b.append(el('span', { class: 'glyph' }, m.glyph), el('span', { class: 'label' }, m.label));
+  return b;
+}
+
 function markActive(path) {
+  const matches = (href) => {
+    const base = href.slice(1);
+    return path === base || path.startsWith(base + '/');
+  };
+
   let anyTab = false;
   for (const b of document.querySelectorAll('.tab[data-href]')) {
-    const base = b.dataset.href.slice(1);
-    const active = path === base || path.startsWith(base + '/');
+    const active = matches(b.dataset.href);
     if (active) anyTab = true;
     b.setAttribute('aria-current', String(active));
   }
+  // On the phone, anything not on a tab belongs to More.
   const more = document.querySelector('.tab[data-more]');
   if (more) more.setAttribute('aria-current', String(!anyTab));
+
+  // The rail lists every destination, so it needs no catch-all. Longest match
+  // wins, otherwise '#/c/people' would also light up under a '#/c' prefix.
+  let best = null;
+  for (const b of document.querySelectorAll('.rail-item[data-href]')) {
+    b.setAttribute('aria-current', 'false');
+    if (matches(b.dataset.href) &&
+        (!best || b.dataset.href.length > best.dataset.href.length)) best = b;
+  }
+  if (best) best.setAttribute('aria-current', 'true');
 }
 
 // ─── More sheet ──────────────────────────────────────────────────────────
@@ -219,9 +297,9 @@ async function settingsView(mount) {
   mount.replaceChildren(
     screenHead('Setup', 'Settings'),
     el('div', { class: 'section-label' }, el('div', { class: 'eyebrow' }, 'Appearance')),
-    el('div', { style: 'padding: 0 20px' }, themeBtn),
+    el('div', { class: 'form-actions' }, themeBtn),
     el('div', { class: 'section-label' }, el('div', { class: 'eyebrow' }, 'Notifications')),
-    el('div', { style: 'padding: 0 20px' }, pushBtn),
+    el('div', { class: 'form-actions' }, pushBtn),
     status,
     hint('Reminders only fire for tasks that have a due time and at least one reminder set.'),
   );
@@ -263,7 +341,7 @@ function signInScreen() {
       el('div', { class: 'field' }, el('label', {}, 'Email'), email),
       el('div', { class: 'field' }, el('label', {}, 'Password'), password),
     ),
-    el('div', { style: 'padding: 0 20px' }, btn),
+    el('div', { class: 'form-actions' }, btn),
   );
 }
 
@@ -275,6 +353,7 @@ async function boot() {
   $('auth').classList.toggle('hidden', !!session);
   $('main').classList.toggle('hidden', !session);
   $('nav').classList.toggle('hidden', !session);
+  $('rail').classList.toggle('hidden', !session);
   $('fab').classList.toggle('hidden', !session);
 
   if (!session) { signInScreen(); return; }
@@ -288,6 +367,7 @@ async function boot() {
   }
 
   buildNav();
+  buildRail();
   $('fab').onclick = () => go('#/capture');
 
   if (!routerStarted) {
