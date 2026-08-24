@@ -362,46 +362,115 @@
   .pill.plain { color: var(--ink-2);  background: var(--surface-2);   border-color: transparent; }
 
   /* ── Work pulse board ───────────────────────────────────────────────── */
-  /* One card per domain: a tappable head (name + rollup pill), a summary
-     line of counts, then a row per project/content item inside it. */
-  .work-domain { border-top: 1px solid var(--line); padding: 16px 20px; }
+  /* Ported from the dashboard's /work screen: domain sections carry a
+     colour swatch, project cards carry a colour bar + progress, content
+     rows carry a colour dot — this is the one screen that leaves the
+     otherwise-monochrome design, matching the dashboard exactly. */
+
+  .work-head-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+  .work-cta {
+    height: 34px; padding: 0 12px; border-radius: 5px; cursor: pointer;
+    background: var(--ink); color: var(--bg); border: 1px solid var(--ink);
+    font-family: var(--mono); font-size: 10px; font-weight: 500;
+    letter-spacing: 0.09em; text-transform: uppercase;
+  }
+  .ghost.small { height: 34px; }
+
+  .work-focus {
+    margin: 4px 20px 20px; padding-bottom: 12px; border-bottom: 1px solid var(--line);
+  }
+  .work-focus-line {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px;
+    font-family: var(--sans); font-size: 14px; color: var(--ink);
+  }
+  .work-focus-line .eyebrow { flex: 0 0 auto; }
+  .work-focus-line .linkish { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; text-decoration: none; }
+
+  .work-domain { border-top: 1px solid var(--line); padding: 16px 20px 20px; }
   .work-domain:last-child { border-bottom: 1px solid var(--line); }
 
   .work-domain-head {
-    display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    width: 100%; background: none; border: none; padding: 0; cursor: pointer;
-    color: inherit; font: inherit; text-align: left;
+    position: sticky; top: 0; z-index: 5;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 8px 0; margin: -8px 0 8px;
+    background: var(--bg); border-bottom: 2px solid var(--ink);
   }
+  .work-swatch {
+    width: 11px; height: 11px; border-radius: 3px; flex: 0 0 auto;
+  }
+  .work-swatch.small { width: 9px; height: 9px; border-radius: 2.5px; }
+  .work-swatch.ring { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--accent); }
   .work-domain-name {
-    display: flex; align-items: center; gap: 8px;
-    font-family: var(--serif); font-size: 19px; letter-spacing: -0.01em; color: var(--ink);
+    background: none; border: none; padding: 0; cursor: pointer; text-align: left;
+    font-family: var(--serif); font-size: 19px; font-weight: 500;
+    letter-spacing: -0.015em; color: var(--ink);
   }
-  .work-domain-meta {
-    margin-top: 6px; display: flex; flex-wrap: wrap; gap: 2px 12px;
-    font-family: var(--mono); font-size: 10px; letter-spacing: 0.06em;
-    text-transform: uppercase; color: var(--ink-3);
+  .work-domain-counts {
+    margin-left: auto; display: flex; align-items: center; gap: 10px;
+    font-family: var(--mono); font-size: 10.5px; font-weight: 500; color: var(--ink-3);
+    white-space: nowrap;
   }
-  .work-domain-meta .over { color: var(--accent); }
+  .work-domain-counts .over { color: var(--accent); }
+  .work-collapse {
+    flex: 0 0 auto; width: 24px; height: 24px; border-radius: 5px;
+    background: none; border: none; color: var(--ink-3); cursor: pointer; font-size: 13px;
+  }
 
-  .work-rows { margin-top: 10px; display: grid; gap: 1px; background: var(--line); border-radius: 5px; overflow: hidden; }
-  .work-row {
-    display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    width: 100%; background: var(--surface); border: none; padding: 12px;
-    color: inherit; font: inherit; text-align: left; cursor: pointer;
-    transition: background 0.12s;
+  .work-project-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px; margin-bottom: 12px;
   }
-  .work-row:active { background: var(--active-wash); }
-  @media (hover: hover) { .work-row:hover { background: var(--hover-wash); } }
-
-  .work-row-main { flex: 1; min-width: 0; }
-  .work-row-title {
-    display: flex; align-items: center; gap: 8px;
-    font-family: var(--sans); font-size: 14px; color: var(--ink);
+  .work-project-card {
+    display: block; width: 100%; text-align: left; cursor: pointer;
+    background: var(--bg); border: 1px solid var(--line); border-radius: 5px;
+    overflow: hidden; padding: 0; color: inherit; font: inherit;
+    transition: border-color 0.12s;
   }
-  .work-row-side { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; }
+  .work-project-card:hover, .work-project-card:active { border-color: var(--line-strong); }
+  .work-project-card.flagged { border-color: rgba(224, 98, 63, 0.5); }
+  .work-project-card.paused { opacity: 0.6; }
+  .work-project-bar { height: 3px; }
+  .work-project-body { padding: 12px 13px; }
+  .work-project-head {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 6px;
+  }
+  .work-project-name {
+    display: inline-flex; align-items: baseline; gap: 6px; min-width: 0;
+    font-family: var(--serif); font-size: 16px; font-weight: 500;
+    letter-spacing: -0.01em; color: var(--ink);
+  }
+  .work-flag-dot { width: 6px; height: 6px; border-radius: 999px; background: var(--accent); flex: 0 0 auto; }
+  .work-project-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
 
-  .progress-bar { width: 44px; height: 4px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
-  .progress-fill { height: 100%; background: var(--good); }
+  .work-content-list { border: 1px solid var(--line); border-radius: 5px; margin-bottom: 12px; overflow: hidden; }
+  .work-content-row {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+    border-bottom: 1px solid var(--line);
+  }
+  .work-content-row:last-child { border-bottom: none; }
+  .work-content-main { flex: 1; min-width: 0; background: none; border: none; padding: 0; text-align: left; cursor: pointer; color: inherit; font: inherit; }
+  .work-content-title { font-family: var(--sans); font-size: 14px; color: var(--ink); }
+
+  .work-links { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+  .work-links .ghost.small { width: auto; margin: 0; }
+  .work-links .linkish {
+    font-family: var(--mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.09em; text-decoration: none;
+  }
+  .work-links .linkish:hover { color: var(--accent); }
+
+  .work-parked { margin-top: 16px; padding: 0 20px; }
+
+  .work-empty { padding: 48px 20px; text-align: center; }
+  .work-empty-title { font-family: var(--serif); font-size: 22px; font-weight: 500; letter-spacing: -0.015em; color: var(--ink); }
+
+  .progress-bar { height: 4px; border-radius: 999px; background: var(--surface-2); overflow: hidden; margin: 4px 0; }
+  .progress-fill { height: 100%; }
+
+  @media (min-width: 800px) {
+    .work-focus, .work-parked { padding-inline: 0; margin-inline: 0; }
+    .work-domain-head { top: 0; }
+    .work-project-grid { grid-template-columns: repeat(auto-fill, minmax(258px, 1fr)); }
+  }
 
   /* ── Forms ───────────────────────────────────────────────────────────── */
 
