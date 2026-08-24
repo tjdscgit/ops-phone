@@ -7,337 +7,484 @@
 <link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#1a1714">
 <link rel="apple-touch-icon" href="./icon-192.png">
+
+<!-- The design's three faces. Loaded from Google Fonts because there is no
+     build step here to self-host them; every rule below carries a real
+     fallback stack so a blocked or slow font never leaves the app unreadable. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap">
+
+<script>
+  // Applied before first paint so a dark-default app never flashes linen.
+  // Dark is the default here — unlike the dashboard — because the phone gets
+  // used outdoors and at 5am. The toggle lives in More.
+  (function () {
+    try {
+      var t = localStorage.getItem('ops-theme');
+      if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+    } catch (e) { /* private mode */ }
+  })();
+</script>
+
 <style>
-  /* Mirrors the dashboard's palette so the two don't feel like different
-     products. Dark-first: this is used outdoors and at night more than at a
-     desk, and a dark card is easier on the eyes at 5am. */
+  /* ═══════════════════════════════════════════════════════════════════════
+     v2 "high-contrast editorial" — the dashboard's design system.
+     Token values are copied verbatim from apps/web/tailwind.config.ts and
+     globals.css so the phone and the dashboard are demonstrably the same
+     product. Dark is :root (the phone's default); light is opt-in.
+     ═══════════════════════════════════════════════════════════════════════ */
+
   :root {
+    color-scheme: dark;
+
     --bg: #1a1714;
     --surface: #221e19;
     --surface-2: #2c2620;
+    --surface-3: #362f27;
+
     --ink: #f3efe7;
     --ink-2: #c5beb1;
     --ink-3: #948c7e;
-    --line: rgba(243, 239, 231, 0.12);
+    /* ink-3 is the floor for TEXT. ink-4 is non-text only — empty checkbox
+       borders, disabled glyphs, hairline outlines. */
+    --ink-4: #635c51;
+
+    --line: rgba(243, 239, 231, 0.1);
+    --line-strong: rgba(243, 239, 231, 0.18);
+    --line-strongest: rgba(243, 239, 231, 0.34);
+
     --accent: #e0623f;
-    --good: #6fae8c;
+    --accent-soft: rgba(224, 98, 63, 0.14);
+    --accent-line: rgba(224, 98, 63, 0.36);
+
     --warn: #d9a544;
+    --warn-soft: rgba(217, 165, 68, 0.14);
+    --warn-line: rgba(217, 165, 68, 0.32);
+
+    --good: #6fae8c;
+    --good-soft: rgba(111, 174, 140, 0.14);
+    --good-line: rgba(111, 174, 140, 0.3);
+
+    --prio3: #7fa3d1;
+
+    --hover-wash: rgba(243, 239, 231, 0.04);
+    --active-wash: rgba(243, 239, 231, 0.07);
+    --selection: rgba(224, 98, 63, 0.3);
+
+    --nav-h: 60px;
   }
+
+  :root[data-theme='light'] {
+    color-scheme: light;
+
+    /* Canvas is warm linen, and raised surfaces go LIGHTER than the canvas so
+       they still read as surfaces; recessed fills stay darker. */
+    --bg: #f6f2ea;
+    --surface: #fcfaf5;
+    --surface-2: #efe9dd;
+    --surface-3: #e6dfd0;
+
+    --ink: #12100e;
+    --ink-2: #57524a;
+    --ink-3: #8b847a;
+    --ink-4: #b6afa4;
+
+    --line: rgba(18, 16, 14, 0.09);
+    --line-strong: rgba(18, 16, 14, 0.17);
+    --line-strongest: rgba(18, 16, 14, 0.34);
+
+    --accent: #b8442b;
+    --accent-soft: rgba(184, 68, 43, 0.09);
+    --accent-line: rgba(184, 68, 43, 0.3);
+
+    --warn: #96650f;
+    --warn-soft: rgba(150, 101, 15, 0.1);
+    --warn-line: rgba(150, 101, 15, 0.28);
+
+    --good: #3b6a52;
+    --good-soft: rgba(59, 106, 82, 0.1);
+    --good-line: rgba(59, 106, 82, 0.26);
+
+    --prio3: #3f5f86;
+
+    --hover-wash: rgba(18, 16, 14, 0.035);
+    --active-wash: rgba(18, 16, 14, 0.06);
+    --selection: rgba(184, 68, 43, 0.22);
+  }
+
+  /* ── Type ────────────────────────────────────────────────────────────── */
+  /* serif = Newsreader (display), sans = Geist (body), mono = Geist Mono
+     (eyebrows, meta, pills). Everything small and uppercase is mono; that
+     contrast is the design's signature. */
+  :root {
+    --serif: 'Newsreader', ui-serif, Georgia, serif;
+    --sans: 'Geist', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
   * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    padding: max(16px, env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
+
+  html, body {
     background: var(--bg);
     color: var(--ink);
-    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* Kill horizontal scroll: a stray wide child must never let the page
+       slide sideways. `clip`, not `hidden`, so sticky headers keep working. */
+    overflow-x: clip;
   }
-  h1 { font-size: 15px; letter-spacing: .12em; text-transform: uppercase;
-       color: var(--ink-3); font-weight: 600; margin: 0 0 16px; }
-  .card { background: var(--surface); border: 1px solid var(--line);
-          border-radius: 10px; padding: 16px; margin-bottom: 16px; }
-  label { display: block; font-size: 11px; letter-spacing: .1em;
-          text-transform: uppercase; color: var(--ink-3); margin-bottom: 8px; }
-  input, textarea {
+
+  body {
+    margin: 0;
+    padding: 0 0 calc(var(--nav-h) + env(safe-area-inset-bottom));
+    font: 400 16px/1.5 var(--sans);
+  }
+
+  ::selection { background: var(--selection); }
+
+  /* ── Editorial primitives ────────────────────────────────────────────── */
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+
+  .hairline { height: 1px; width: 100%; background: var(--line); }
+  .hairline-strong { height: 1px; width: 100%; background: var(--line-strong); }
+
+  /* Screen header: mono eyebrow over a Newsreader display title. Reused on
+     every screen — it is what makes this read as the same app. */
+  .screen-head { padding: 32px 20px 20px; }
+  .screen-head .eyebrow { margin-bottom: 8px; }
+  .screen-head h1 {
+    margin: 0;
+    font-family: var(--serif);
+    font-size: 28px;
+    line-height: 1.05;
+    font-weight: 500;
+    letter-spacing: -0.015em;
+    color: var(--ink);
+    text-transform: none;
+  }
+  .screen-head .meta {
+    margin-top: 8px;
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--ink-3);
+  }
+  .screen-head .row-actions { display: flex; align-items: flex-end; gap: 10px; }
+  .screen-head .row-actions > div:first-child { flex: 1; min-width: 0; }
+
+  /* Section label: eyebrow on a rule, the divider between list blocks. */
+  .section-label {
+    display: flex; align-items: center; gap: 10px;
+    padding: 24px 20px 8px;
+  }
+  .section-label .eyebrow { flex: 1; min-width: 0; }
+
+  .screen { padding-bottom: 24px; }
+
+  /* ── Surfaces ────────────────────────────────────────────────────────── */
+  /* The dashboard is hairline-and-whitespace, not boxes-in-boxes: lists sit
+     directly on the canvas divided by rules. A `.panel` is used only where
+     something genuinely needs lifting off the page (forms, sign-in). */
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 16px;
+    margin: 0 20px 16px;
+  }
+
+  .list { border-top: 1px solid var(--line); }
+
+  .item {
+    display: block; width: 100%; text-align: left;
+    background: none; border: none;
+    border-bottom: 1px solid var(--line);
+    padding: 14px 20px;
+    color: var(--ink); font: inherit; cursor: pointer;
+    transition: background 0.12s;
+  }
+  .item:active { background: var(--active-wash); }
+  @media (hover: hover) { .item:hover { background: var(--hover-wash); } }
+
+  .item-title {
+    font-family: var(--sans); font-size: 15px; line-height: 1.4;
+    /* Two lines then ellipsis: a long quote shouldn't own the list. */
+    display: -webkit-box; -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .item-title.serif {
+    font-family: var(--serif); font-size: 17px; font-weight: 400;
+    letter-spacing: -0.01em;
+  }
+
+  /* Meta is mono, uppercase, letter-spaced — the counterweight to the serif. */
+  .item-meta {
+    margin-top: 4px;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px;
+    font-family: var(--mono); font-size: 10px; font-weight: 400;
+    letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3);
+  }
+  .item-meta.plain { text-transform: none; letter-spacing: 0.02em; font-size: 11px; }
+
+  /* Row with its own control (checkbox) beside a tappable body. */
+  .row-item { display: flex; align-items: flex-start; gap: 12px; cursor: default; }
+  .item-body {
+    flex: 1; min-width: 0; background: none; border: none;
+    text-align: left; padding: 0; color: inherit; font: inherit; cursor: pointer;
+  }
+  .item-body.static { cursor: default; }
+
+  /* ── Checkbox ────────────────────────────────────────────────────────── */
+  /* 20px, square, hairline border — deliberately not a rounded green tick.
+     Done fills with ink-2 and shows a canvas-coloured check. */
+  .tick {
+    flex: 0 0 auto; width: 20px; height: 20px; margin-top: 2px;
+    display: grid; place-items: center;
+    border: 1px solid var(--line-strong); border-radius: 0;
+    background: transparent; cursor: pointer; padding: 0;
+    transition: border-color 0.12s, background 0.12s;
+  }
+  .tick svg { width: 12px; height: 12px; display: none; }
+  .tick.on { background: var(--ink-2); border-color: var(--ink-2); }
+  .tick.on svg { display: block; stroke: var(--bg); }
+  /* Waiting reads as provisional, so the box is dashed rather than solid. */
+  .tick.waiting { border-style: dashed; border-color: var(--ink-3); }
+  .tick.dismiss { border: none; color: var(--ink-3); font-size: 16px; line-height: 1; }
+
+  /* ── Pills ───────────────────────────────────────────────────────────── */
+  /* The one place the palette leaves monochrome: four states, each a colour
+     plus soft fill and border, with a leading dot echoing the state. */
+  .pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    height: 20px; padding: 0 8px; border-radius: 999px;
+    border: 1px solid transparent;
+    font-family: var(--mono); font-size: 9.5px; font-weight: 600;
+    line-height: 1; letter-spacing: 0.07em; text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .pill .dot { width: 5px; height: 5px; border-radius: 999px; background: currentColor; flex: 0 0 auto; }
+  .pill.over  { color: var(--accent); background: var(--accent-soft); border-color: var(--accent-line); }
+  .pill.due   { color: var(--warn);   background: var(--warn-soft);   border-color: var(--warn-line); }
+  .pill.ok    { color: var(--good);   background: var(--good-soft);   border-color: var(--good-line); }
+  .pill.quiet { color: var(--ink-3);  background: transparent;        border-color: var(--line-strong); }
+  .pill.solid { color: var(--bg);     background: var(--accent);      border-color: var(--accent); }
+  .pill.plain { color: var(--ink-2);  background: var(--surface-2);   border-color: transparent; }
+
+  /* ── Forms ───────────────────────────────────────────────────────────── */
+
+  label {
+    display: block;
+    font-family: var(--mono); font-size: 10px; font-weight: 600;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--ink-3); margin-bottom: 8px;
+  }
+
+  input, textarea, select {
     width: 100%; background: var(--surface-2); color: var(--ink);
-    border: 1px solid var(--line); border-radius: 6px; padding: 12px;
-    /* 16px minimum stops iOS/Android zooming the page on focus. */
-    font-size: 16px; font-family: inherit; outline: none;
+    border: 1px solid var(--line); border-radius: 5px; padding: 11px 12px;
+    /* 16px minimum stops Android/iOS zooming the page on focus. */
+    font: 400 16px/1.5 var(--sans); outline: none;
+    transition: border-color 0.12s;
   }
-  input:focus, textarea:focus { border-color: var(--accent); }
-  textarea { resize: none; }
-  .chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin: 0 -2px; }
-  .chip {
-    flex: 0 0 auto; padding: 10px 14px; border-radius: 6px;
-    border: 1px solid var(--line); background: var(--surface-2);
-    color: var(--ink-2); font-size: 14px; cursor: pointer;
-    /* Big enough to hit with a work glove on. */
-    min-height: 44px;
-  }
-  .chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+  textarea { resize: vertical; }
+  select { appearance: none; min-height: 46px; }
+
   .field { margin-top: 16px; }
+  .field:first-child { margin-top: 0; }
+
+  label.check {
+    display: flex; align-items: center; gap: 10px;
+    font-family: var(--sans); font-size: 15px; font-weight: 400;
+    letter-spacing: 0; text-transform: none; color: var(--ink);
+    margin: 0; min-height: 44px;
+  }
+  label.check input { width: 20px; height: 20px; accent-color: var(--accent); flex: 0 0 auto; }
+
+  /* ── Chips ───────────────────────────────────────────────────────────── */
+  .chips {
+    display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px;
+    margin: 0 -2px; scrollbar-width: none;
+  }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip {
+    flex: 0 0 auto; min-height: 40px; padding: 0 12px; border-radius: 5px;
+    border: 1px solid var(--line); background: var(--surface-2);
+    color: var(--ink-2); cursor: pointer;
+    font-family: var(--mono); font-size: 11px; font-weight: 500;
+    letter-spacing: 0.05em; text-transform: uppercase;
+  }
+  .chip[aria-pressed="true"] {
+    background: var(--ink); color: var(--bg); border-color: var(--ink);
+  }
+
+  /* ── Buttons ─────────────────────────────────────────────────────────── */
   button.primary {
-    width: 100%; min-height: 52px; margin-top: 20px; border: none;
-    border-radius: 8px; background: var(--accent); color: #fff;
-    font-size: 16px; font-weight: 600; cursor: pointer;
+    width: 100%; min-height: 48px; margin-bottom: 10px;
+    border: 1px solid var(--accent); border-radius: 5px;
+    background: var(--accent); color: #fff;
+    font-family: var(--sans); font-size: 15px; font-weight: 500; cursor: pointer;
   }
   button.primary:disabled { opacity: .5; }
+
   button.ghost {
-    width: 100%; min-height: 48px; border-radius: 8px; cursor: pointer;
-    background: transparent; color: var(--ink-2); border: 1px solid var(--line);
-    font-size: 14px;
+    width: 100%; min-height: 44px; border-radius: 5px; cursor: pointer;
+    background: transparent; color: var(--ink-2); border: 1px solid var(--line-strong);
+    font-family: var(--mono); font-size: 11px; font-weight: 500;
+    letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 10px;
   }
-  .msg { margin-top: 12px; font-size: 14px; min-height: 20px; }
-  .msg.ok { color: var(--good); }
-  .msg.err { color: var(--accent); }
-  .hint { font-size: 12px; color: var(--ink-3); margin-top: 8px; }
+  button.ghost.danger { color: var(--accent); border-color: var(--accent-line); }
+  button.ghost.small {
+    width: auto; min-height: 32px; padding: 0 10px; margin: 0; font-size: 10px;
+  }
+
+  .icon-btn {
+    flex: 0 0 auto; width: 34px; height: 34px; border-radius: 5px;
+    background: transparent; border: 1px solid var(--line-strong);
+    color: var(--ink-2); cursor: pointer;
+    display: grid; place-items: center; font-size: 18px; line-height: 1;
+    font-family: var(--sans);
+  }
+
   .row { display: flex; gap: 8px; }
   .row > * { flex: 1; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .actions > * { flex: 0 0 auto; }
+
+  .controls { padding: 0 20px 4px; display: grid; gap: 10px; }
+  .hint {
+    font-family: var(--mono); font-size: 11px; line-height: 1.5;
+    color: var(--ink-3); padding: 14px 20px;
+  }
+  .panel .hint, .field .hint { padding: 8px 0 0; }
   .hidden { display: none !important; }
-  .task { padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 15px; }
-  .task:last-child { border-bottom: none; }
-  .task .meta { font-size: 12px; color: var(--ink-3); margin-top: 2px; }
-  .task.overdue .meta { color: var(--warn); }
+
+  /* ── Capture FAB ─────────────────────────────────────────────────────── */
+  /* Capture is an action available everywhere, not a destination — so it
+     floats above the bar rather than spending one of the five tab slots. */
+  .fab {
+    position: fixed; right: 16px;
+    bottom: calc(var(--nav-h) + 16px + env(safe-area-inset-bottom));
+    z-index: 30; width: 52px; height: 52px; border-radius: 999px;
+    background: var(--accent); color: #fff; border: none; cursor: pointer;
+    display: grid; place-items: center;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+  }
+
+  /* ── Bottom bar ──────────────────────────────────────────────────────── */
+  nav.bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+    display: flex; background: var(--surface);
+    border-top: 1px solid var(--line);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .tab {
+    flex: 1; min-height: var(--nav-h); border: none; background: none;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 2px;
+    color: var(--ink-3); cursor: pointer;
+    font-family: var(--sans); font-size: 11px; font-weight: 500; line-height: 1;
+    transition: color 0.12s;
+  }
+  .tab svg { width: 22px; height: 22px; }
+  .tab[aria-current="true"] { color: var(--ink); font-weight: 600; }
+
+  /* ── More sheet ──────────────────────────────────────────────────────── */
+  .sheet-scrim {
+    position: fixed; inset: 0; z-index: 50;
+    background: rgba(0, 0, 0, 0.45);
+    opacity: 0; transition: opacity 0.18s;
+  }
+  .sheet-scrim.show { opacity: 1; }
+
+  .sheet {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 51;
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+    border-radius: 12px 12px 0 0;
+    padding-bottom: env(safe-area-inset-bottom);
+    max-height: 82vh; overflow-y: auto;
+    transform: translateY(100%); transition: transform 0.22s ease;
+  }
+  .sheet.show { transform: none; }
+  .sheet-grip {
+    width: 36px; height: 4px; border-radius: 999px;
+    background: var(--line-strong); margin: 10px auto 2px;
+  }
+  .sheet-head { padding: 6px 20px 10px; border-bottom: 1px solid var(--line); }
+  .sheet-foot {
+    padding: 12px 20px; border-top: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  }
+  .sheet-item {
+    display: flex; align-items: center; gap: 12px;
+    width: 100%; padding: 13px 20px; border: none; background: none;
+    color: var(--ink); font: 400 15px var(--sans); text-align: left; cursor: pointer;
+  }
+  .sheet-item:active { background: var(--active-wash); }
+  .sheet-item .glyph {
+    width: 22px; flex: 0 0 auto; display: grid; place-items: center;
+    color: var(--ink-3); font-size: 15px;
+  }
+
+  /* ── Toast ───────────────────────────────────────────────────────────── */
+  .toast {
+    position: fixed; left: 16px; right: 16px;
+    bottom: calc(var(--nav-h) + 16px + env(safe-area-inset-bottom));
+    z-index: 60; padding: 12px 14px; border-radius: 5px;
+    background: var(--surface-3); border: 1px solid var(--line-strong);
+    color: var(--ink);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em;
+    opacity: 0; transform: translateY(8px); pointer-events: none;
+    transition: opacity .18s, transform .18s;
+  }
+  .toast.show { opacity: 1; transform: none; }
+  .toast.ok { border-color: var(--good-line); color: var(--good); }
+  .toast.err { border-color: var(--accent-line); color: var(--accent); }
+
+  /* ── Sign in ─────────────────────────────────────────────────────────── */
+  #auth { padding: 12vh 20px 0; }
+  #auth .brand {
+    font-family: var(--serif); font-size: 34px; font-weight: 500;
+    letter-spacing: -0.02em; line-height: 1.05; margin: 0 0 4px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .toast, .sheet, .sheet-scrim, .item { transition: none; }
+  }
 </style>
 </head>
 <body>
 
-<!-- Sign in ------------------------------------------------------------- -->
-<section id="auth" class="card hidden">
-  <h1>Roseberry Ops</h1>
-  <label for="email">Email</label>
-  <!-- Phone keyboards capitalise and autocorrect by default, which silently
-       breaks email sign-in. Same fix as the dashboard's sign-in form. -->
-  <input id="email" type="email" inputmode="email" autocomplete="username"
-         autocapitalize="none" autocorrect="off" spellcheck="false">
-  <div class="field">
-    <label for="password">Password</label>
-    <input id="password" type="password" autocomplete="current-password">
-  </div>
-  <button id="signin" class="primary">Sign in</button>
-  <div id="authMsg" class="msg"></div>
-</section>
+<section id="auth" class="hidden"></section>
 
-<!-- Quick add ----------------------------------------------------------- -->
-<section id="app" class="hidden">
-  <h1>Quick add</h1>
+<main id="main" class="hidden"></main>
 
-  <div class="card">
-    <textarea id="title" rows="3" placeholder="What needs doing?"
-              autocapitalize="sentences"></textarea>
+<button id="fab" class="fab hidden" type="button" aria-label="Capture">
+  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+       stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+    <path d="M12 5v14M5 12h14"/>
+  </svg>
+</button>
 
-    <div class="field">
-      <label>Folder</label>
-      <div class="chips" id="folders"></div>
-    </div>
+<nav id="nav" class="bar hidden" aria-label="Primary"></nav>
 
-    <div class="field">
-      <label>When</label>
-      <div class="chips" id="whens"></div>
-      <div class="row" style="margin-top:8px">
-        <input id="date" type="date">
-        <input id="time" type="time">
-      </div>
-    </div>
+<div id="sheetScrim" class="sheet-scrim hidden"></div>
+<div id="sheet" class="sheet hidden" role="dialog" aria-modal="true" aria-label="More"></div>
 
-    <div class="field">
-      <label>Priority</label>
-      <div class="chips" id="prios"></div>
-    </div>
-
-    <button id="save" class="primary">Save</button>
-    <div id="saveMsg" class="msg"></div>
-  </div>
-
-  <div class="card">
-    <h1 style="margin-bottom:12px">Due today</h1>
-    <div id="today"><div class="hint">Loading…</div></div>
-  </div>
-
-  <div class="card">
-    <button id="enablePush" class="ghost">Enable notifications</button>
-    <div id="pushMsg" class="msg"></div>
-    <button id="signout" class="ghost" style="margin-top:12px">Sign out</button>
-  </div>
-</section>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
 
 <script src="./config.js"></script>
-<script type="module">
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-const cfg = window.OPS_CONFIG;
-const sb = createClient(cfg.supabaseUrl, cfg.supabaseKey);
-
-const $ = (id) => document.getElementById(id);
-const state = { domain: '', date: '', priority: 4, domains: [] };
-
-// ─── Date helpers (phone's own clock — "today" must mean today here) ──────
-const ymd = (d) => {
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${d.getFullYear()}-${m}-${day}`;
-};
-const addDays = (d, n) => { const c = new Date(d); c.setDate(c.getDate() + n); return c; };
-
-// ─── Chip rendering ──────────────────────────────────────────────────────
-function renderChips(el, options, selected, onPick) {
-  el.innerHTML = '';
-  for (const opt of options) {
-    const b = document.createElement('button');
-    b.className = 'chip';
-    b.type = 'button';
-    b.textContent = opt.label;
-    b.setAttribute('aria-pressed', String(opt.value === selected));
-    b.onclick = () => onPick(opt.value);
-    el.appendChild(b);
-  }
-}
-
-function paintAll() {
-  renderChips($('folders'),
-    [{ value: '', label: 'Inbox' }, ...state.domains.map((d) => ({ value: d.id, label: d.name }))],
-    state.domain, (v) => { state.domain = v; paintAll(); });
-
-  const now = new Date();
-  renderChips($('whens'), [
-    { value: '', label: 'None' },
-    { value: ymd(now), label: 'Today' },
-    { value: ymd(addDays(now, 1)), label: 'Tomorrow' },
-    { value: ymd(addDays(now, (6 - now.getDay() + 7) % 7)), label: 'Weekend' },
-  ], state.date, (v) => { state.date = v; $('date').value = v; if (!v) $('time').value = ''; paintAll(); });
-
-  renderChips($('prios'), [1, 2, 3, 4].map((p) => ({ value: p, label: 'P' + p })),
-    state.priority, (v) => { state.priority = v; paintAll(); });
-}
-
-$('date').onchange = (e) => { state.date = e.target.value; paintAll(); };
-
-// ─── Save ────────────────────────────────────────────────────────────────
-$('save').onclick = async () => {
-  const title = $('title').value.trim();
-  const msg = $('saveMsg');
-  if (!title) { msg.className = 'msg err'; msg.textContent = 'Type something first.'; return; }
-
-  $('save').disabled = true;
-  msg.className = 'msg'; msg.textContent = 'Saving…';
-
-  const time = $('time').value;
-  const row = {
-    title,
-    due_date: state.date || null,
-    due_time: time || null,
-    priority: state.priority,
-    // domain_id is NOT NULL; no folder picked means Inbox.
-    domain_id: state.domain || state.inbox?.id,
-    source: 'manual',
-  };
-
-  const { error } = await sb.from('tasks').insert(row);
-  $('save').disabled = false;
-  if (error) { msg.className = 'msg err'; msg.textContent = error.message; return; }
-
-  msg.className = 'msg ok'; msg.textContent = 'Saved.';
-  $('title').value = '';
-  state.date = ''; state.priority = 4;
-  $('date').value = ''; $('time').value = '';
-  paintAll(); loadToday();
-};
-
-// ─── Today list ──────────────────────────────────────────────────────────
-async function loadToday() {
-  const today = ymd(new Date());
-  const { data, error } = await sb
-    .from('tasks')
-    .select('id, title, due_date, due_time, priority')
-    .eq('status', 'open')
-    .not('due_date', 'is', null)
-    .lte('due_date', today)
-    .order('due_date')
-    .limit(20);
-
-  const el = $('today');
-  if (error) { el.innerHTML = `<div class="hint">${error.message}</div>`; return; }
-  if (!data.length) { el.innerHTML = '<div class="hint">Nothing due. </div>'; return; }
-
-  el.innerHTML = data.map((t) => {
-    const overdue = t.due_date < today;
-    const when = overdue ? `Overdue · ${t.due_date}` : (t.due_time ? t.due_time.slice(0, 5) : 'Today');
-    return `<div class="task ${overdue ? 'overdue' : ''}">${escapeHtml(t.title)}
-              <div class="meta">${when} · P${t.priority}</div></div>`;
-  }).join('');
-}
-
-const escapeHtml = (s) => s.replace(/[&<>"']/g, (c) =>
-  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-
-// ─── Push notifications ──────────────────────────────────────────────────
-// VAPID keys are base64url; the browser wants a Uint8Array.
-function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const raw = atob(base64);
-  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
-}
-
-$('enablePush').onclick = async () => {
-  const msg = $('pushMsg');
-  if (!cfg.vapidPublicKey) {
-    msg.className = 'msg err';
-    msg.textContent = 'No VAPID public key set in config.js yet.';
-    return;
-  }
-  try {
-    msg.className = 'msg'; msg.textContent = 'Requesting permission…';
-    const perm = await Notification.requestPermission();
-    if (perm !== 'granted') {
-      msg.className = 'msg err';
-      msg.textContent = 'Permission denied. Enable it in your browser settings for this site.';
-      return;
-    }
-
-    const reg = await navigator.serviceWorker.ready;
-    // An existing subscription is reused; re-subscribing the same device just
-    // upserts by endpoint, so this is safe to press repeatedly.
-    const sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(cfg.vapidPublicKey),
-    });
-
-    const json = sub.toJSON();
-    const { error } = await sb.from('push_subscriptions').upsert({
-      endpoint: json.endpoint,
-      p256dh: json.keys.p256dh,
-      auth: json.keys.auth,
-      label: navigator.userAgent.slice(0, 120),
-      failed_at: null,
-    }, { onConflict: 'endpoint' });
-
-    if (error) { msg.className = 'msg err'; msg.textContent = error.message; return; }
-    msg.className = 'msg ok'; msg.textContent = 'Notifications enabled on this device.';
-  } catch (err) {
-    msg.className = 'msg err';
-    msg.textContent = err.message || String(err);
-  }
-};
-
-// ─── Auth ────────────────────────────────────────────────────────────────
-$('signin').onclick = async () => {
-  const msg = $('authMsg');
-  msg.className = 'msg'; msg.textContent = 'Signing in…';
-  const { error } = await sb.auth.signInWithPassword({
-    email: $('email').value.trim(),
-    password: $('password').value,
-  });
-  if (error) { msg.className = 'msg err'; msg.textContent = error.message; return; }
-  boot();
-};
-
-$('signout').onclick = async () => { await sb.auth.signOut(); boot(); };
-
-async function boot() {
-  const { data: { session } } = await sb.auth.getSession();
-  $('auth').classList.toggle('hidden', !!session);
-  $('app').classList.toggle('hidden', !session);
-  if (!session) return;
-
-  const { data } = await sb.from('stewardship_domains').select('id, name, is_system');
-  const all = data ?? [];
-  // Chips show the real folders only; Inbox is rendered separately as the
-  // default option, and kept aside because domain_id is NOT NULL and an
-  // unselected folder has to fall back to something.
-  state.domains = all
-    .filter((d) => !d.is_system)
-    .sort((a, b) => a.name.localeCompare(b.name));
-  state.inbox = all.find((d) => d.is_system) ?? null;
-
-  paintAll();
-  loadToday();
-}
-
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js');
-}
-boot();
-</script>
+<script type="module" src="./app.js"></script>
 </body>
 </html>
