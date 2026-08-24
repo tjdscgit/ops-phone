@@ -7,11 +7,12 @@
 // Layout and colours are copied from the dashboard, not reinvented — the two
 // are meant to be demonstrably the same product at a different width.
 
-import { sb, ref, refName } from '../lib/db.js';
-import { el, hint, spinner, pill, humanise, chips, toast, fail } from '../lib/ui.js';
+import { sb, refName } from '../lib/db.js';
+import { el, hint, spinner, pill, humanise, toast, fail } from '../lib/ui.js';
 import { go } from '../lib/router.js';
 import { loadWork } from '../lib/work.js';
 import { domainColor } from '../lib/domain-colors.js';
+import { openSheet, closeSheet } from '../app.js';
 
 const CONTENT_TYPE_LABEL = {
   video: 'Video', course: 'Course', article: 'Article',
@@ -26,6 +27,8 @@ const domainNeedsAttention = (d) =>
   d.rollup.attention > 0 || d.projects.some(projectNeedsAttention) || d.content.some(contentNeedsAttention) ||
   d.direct.overdue > 0 || d.direct.waitingAging > 0;
 
+const STATUS_ORDER = ['over', 'due', 'ok', 'quiet'];
+
 export async function workView(mount) {
   mount.replaceChildren(masthead(0), spinner());
 
@@ -37,55 +40,108 @@ export async function workView(mount) {
     return;
   }
 
+  // Facet state — a port of work-view.tsx's filters (View / Domain / Status /
+  // Show), rendered once as a desktop sidebar and once inside the mobile
+  // Filters sheet, same pattern as the dashboard's FacetRail.
   let attention = false;
+  const dsel = new Set();
+  const ssel = new Set();
+  const kinds = new Set(['projects', 'content', 'tasks']);
   const collapsed = new Set();
+  let showParked = false;
 
-  const body = el('div', { class: 'screen work-screen' });
-  mount.lastChild.replaceWith(body);
   mount.firstChild.replaceWith(masthead(w.ideasCount));
+  const layout = el('div', { class: 'work-layout' });
+  mount.lastChild.replaceWith(layout);
+
+  const applyFacets = (d) => {
+    let projects = kinds.has('projects') ? d.projects : [];
+    let content = kinds.has('content') ? d.content : [];
+    if (attention) {
+      projects = projects.filter(projectNeedsAttention);
+      content = content.filter(contentNeedsAttention);
+    }
+    if (ssel.size) {
+      projects = projects.filter((p) => ssel.has(p.urgency));
+      content = content.filter((c) => ssel.has(c.urgency));
+    }
+    const directHot = kinds.has('tasks') && (d.direct.overdue > 0 || d.direct.waitingAging > 0);
+    if (attention && d.rollup.attention === 0 && !projects.length && !content.length && !directHot) return null;
+    if (ssel.size && !ssel.has(d.urgency) && !projects.length && !content.length) return null;
+    return { ...d, projects, content };
+  };
 
   async function render() {
     const attentionCount = w.domains.filter(domainNeedsAttention).length;
+    const activeFilterCount = dsel.size + ssel.size + (attention ? 1 : 0) + (3 - kinds.size);
 
-    const filter = chips(
-      [
-        { value: 'all', label: `All work (${w.domains.length})` },
-        { value: 'attention', label: `Needs attention (${attentionCount})` },
-      ],
-      attention ? 'attention' : 'all',
-      (v) => { attention = v === 'attention'; render(); },
-    );
+    let list = w.domains;
+    if (dsel.size) list = list.filter((d) => dsel.has(d.id));
+    const visible = list.map(applyFacets).filter((d) => d !== null);
 
-    const visible = attention ? w.domains.filter(domainNeedsAttention) : w.domains;
+    const nothingFlagged = attention && dsel.size === 0 && ssel.size === 0 && kinds.size === 3 && visible.length === 0;
+
+    const facetGroups = buildFacetGroups({
+      w, attention, dsel, ssel, kinds, attentionCount, activeFilterCount,
+      setAttention: (v) => { attention = v; render(); },
+      toggleDomain: (id) => { dsel.has(id) ? dsel.delete(id) : dsel.add(id); render(); },
+      clearDomains: () => { dsel.clear(); render(); },
+      toggleStatus: (s) => { ssel.has(s) ? ssel.delete(s) : ssel.add(s); render(); },
+      clearStatus: () => { ssel.clear(); render(); },
+      toggleKind: (k) => { kinds.has(k) ? kinds.delete(k) : kinds.add(k); render(); },
+      reset: () => { attention = false; dsel.clear(); ssel.clear(); kinds.clear(); ['projects', 'content', 'tasks'].forEach((k) => kinds.add(k)); render(); },
+    });
 
     const focusRow = await tomorrowFocusRow(w);
 
     const sections = [];
-    if (attention && visible.length === 0) {
+    if (nothingFlagged) {
       sections.push(emptyState('Nothing needs attention.', 'Everything is on pace. Rare — worth noticing.'));
+    } else if (visible.length === 0) {
+      sections.push(emptyState('Nothing matches this view.', 'Loosen a filter, or reset them all.'));
     } else {
       sections.push(...visible.map((d) => domainSection(d, collapsed, render)));
     }
 
-    const parked = w.parked.length
+    const parkedVisible = w.parked.map(applyFacets).filter((d) => d !== null);
+    const parked = parkedVisible.length
       ? el('div', { class: 'work-parked' },
           el('button', {
             class: 'linkish', type: 'button', style: 'font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:0.08em; text-decoration:none',
-            onclick: (e) => {
-              const wrap = e.currentTarget.nextSibling;
-              wrap.classList.toggle('hidden');
-            },
-          }, `Parked (${w.parked.length})`),
-          el('div', { class: 'hidden', style: 'margin-top:12px; opacity:0.6' },
-            ...w.parked.map((d) => domainSection(d, collapsed, render))))
+            onclick: () => { showParked = !showParked; render(); },
+          }, `${showParked ? '▾' : '▸'} Parked (${parkedVisible.length})`),
+          showParked
+            ? el('div', { style: 'margin-top:12px; opacity:0.6' }, ...parkedVisible.map((d) => domainSection(d, collapsed, render)))
+            : null)
       : null;
 
-    body.replaceChildren(
-      el('div', { class: 'controls', style: 'padding-top:0' }, filter),
+    const body = el('div', { class: 'work-body' },
       focusRow,
       ...sections,
       parked,
     );
+
+    // Desktop sidebar sits beside the body; mobile gets a floating Filters
+    // pill that opens the same groups in the shared bottom sheet.
+    const desktopRail = el('aside', { class: 'facet-rail' }, ...facetGroups);
+    const filtersBtn = el('button', {
+      class: 'filters-fab', type: 'button',
+      onclick: () => openSheet(el('div', {},
+        el('div', { class: 'sheet-head' }, el('div', { class: 'eyebrow' }, 'Filters')),
+        el('div', { style: 'padding-top:8px' }, ...buildFacetGroups({
+          w, attention, dsel, ssel, kinds, attentionCount, activeFilterCount,
+          setAttention: (v) => { attention = v; closeSheet(); render(); },
+          toggleDomain: (id) => { dsel.has(id) ? dsel.delete(id) : dsel.add(id); closeSheet(); render(); },
+          clearDomains: () => { dsel.clear(); closeSheet(); render(); },
+          toggleStatus: (s) => { ssel.has(s) ? ssel.delete(s) : ssel.add(s); closeSheet(); render(); },
+          clearStatus: () => { ssel.clear(); closeSheet(); render(); },
+          toggleKind: (k) => { kinds.has(k) ? kinds.delete(k) : kinds.add(k); closeSheet(); render(); },
+          reset: () => { attention = false; dsel.clear(); ssel.clear(); kinds.clear(); ['projects', 'content', 'tasks'].forEach((k) => kinds.add(k)); closeSheet(); render(); },
+        })),
+      )),
+    }, `Filters${activeFilterCount ? ` · ${activeFilterCount}` : ''}`);
+
+    layout.replaceChildren(desktopRail, filtersBtn, body);
   }
 
   await render();
@@ -104,6 +160,73 @@ function masthead(ideasCount) {
       ),
     ),
   );
+}
+
+// ─── Facet groups ────────────────────────────────────────────────────────
+// A port of FacetRail.tsx's groups (View / Domain / Status / Show), used both
+// in the desktop sidebar and inside the mobile Filters sheet — same content,
+// same callbacks, two places it renders.
+
+function facetGroup(label, action, ...children) {
+  return el('div', { class: 'facet-group' },
+    el('div', { class: 'facet-group-head' },
+      el('span', { class: 'eyebrow' }, label),
+      action ? el('div', {}, action) : null,
+    ),
+    ...children,
+  );
+}
+
+function facetRow({ on, color, name, count, onClick }) {
+  return el('button', { class: `facet-row ${on ? 'on' : ''}`, type: 'button', onclick: onClick },
+    color ? el('span', { class: 'facet-swatch', style: `background:${color}` }) : null,
+    el('span', { class: 'facet-row-name' }, name),
+    count != null ? el('span', { class: 'facet-row-count' }, String(count)) : null,
+  );
+}
+
+function facetTag({ on, name, onClick }) {
+  return el('button', { class: `facet-tag ${on ? 'on' : ''}`, type: 'button', onclick: onClick }, name);
+}
+
+function clearBtn(onClick) {
+  return el('button', { class: 'linkish', type: 'button', style: 'font-family:var(--mono); font-size:9px; text-transform:uppercase; letter-spacing:0.09em; text-decoration:none', onclick }, 'Clear');
+}
+
+function buildFacetGroups({
+  w, attention, dsel, ssel, kinds, attentionCount, activeFilterCount,
+  setAttention, toggleDomain, clearDomains, toggleStatus, clearStatus, toggleKind, reset,
+}) {
+  return [
+    facetGroup('View', activeFilterCount > 0 ? clearResetBtn(reset) : null,
+      facetRow({ on: !attention, name: `All work`, count: w.domains.length, onClick: () => setAttention(false) }),
+      facetRow({ on: attention, name: 'Needs attention', count: attentionCount, onClick: () => setAttention(true) }),
+    ),
+    el('div', { class: 'facet-sep' }),
+    facetGroup('Domain', dsel.size ? clearBtn(clearDomains) : null,
+      ...w.domains.map((d) => facetRow({
+        on: dsel.has(d.id), color: domainColor(d.name), name: d.name,
+        count: d.projects.length + d.content.length + d.rollup.open,
+        onClick: () => toggleDomain(d.id),
+      })),
+    ),
+    el('div', { class: 'facet-sep' }),
+    facetGroup('Status', ssel.size ? clearBtn(clearStatus) : null,
+      el('div', { class: 'facet-tags' },
+        ...STATUS_ORDER.map((s) => facetTag({ on: ssel.has(s), name: URGENCY_LABEL[s], onClick: () => toggleStatus(s) })),
+      ),
+    ),
+    el('div', { class: 'facet-sep' }),
+    facetGroup('Show', null,
+      facetRow({ on: kinds.has('projects'), name: 'Projects', onClick: () => toggleKind('projects') }),
+      facetRow({ on: kinds.has('content'), name: 'Content', onClick: () => toggleKind('content') }),
+      facetRow({ on: kinds.has('tasks'), name: 'Direct tasks', onClick: () => toggleKind('tasks') }),
+    ),
+  ];
+}
+
+function clearResetBtn(onClick) {
+  return el('button', { class: 'linkish', type: 'button', style: 'font-family:var(--mono); font-size:9px; text-transform:uppercase; letter-spacing:0.09em; text-decoration:none', onclick }, 'Reset');
 }
 
 // ─── Tomorrow's focus ──────────────────────────────────────────────────────
@@ -227,7 +350,11 @@ function domainSection(d, collapsed, refresh) {
         ? el('button', { class: 'ghost small', type: 'button', onclick: () => go('#/tasks') },
             `Direct tasks ${d.direct.open}${d.direct.overdue ? ` · ${d.direct.overdue} overdue` : ''}${d.direct.waiting ? ` · ${d.direct.waiting} waiting` : ''}`)
         : null,
-      el('button', { class: 'linkish', type: 'button', onclick: () => go(`#/c/projects/new?domain_id=${d.id}`) }, `+ Project in ${d.name}`),
+      // The hash router has no query-string support, so this can't preselect
+      // the domain the way the dashboard's ?domain_id= link does — it opens
+      // the same blank form as the masthead's "+ Project" and the domain is
+      // picked there.
+      el('button', { class: 'linkish', type: 'button', onclick: () => go('#/c/projects/new') }, `+ Project in ${d.name}`),
     );
     kids.push(links);
     if (empty) kids.push(el('p', { class: 'item-meta plain', style: 'font-style:italic; margin-top:2px' }, 'Nothing open.'));

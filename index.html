@@ -367,6 +367,58 @@
      rows carry a colour dot — this is the one screen that leaves the
      otherwise-monochrome design, matching the dashboard exactly. */
 
+  /* ── Facet rail ─────────────────────────────────────────────────────── */
+  /* A port of FacetRail.tsx: the one filtering pattern for every list screen.
+     Desktop: a sticky left sidebar. Phone: a floating pill that opens the
+     same groups in the shared bottom sheet — see lib/sheet via app.js. */
+  .work-layout { display: block; }
+  .work-body { padding-bottom: 24px; }
+  .facet-rail { display: none; }
+  .filters-fab {
+    position: fixed; left: 16px; z-index: 35;
+    bottom: calc(var(--nav-h) + 16px + env(safe-area-inset-bottom));
+    height: 42px; padding: 0 16px; border-radius: 999px;
+    background: var(--ink); color: var(--bg); border: none; cursor: pointer;
+    font-family: var(--sans); font-size: 13px; font-weight: 500;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.28);
+  }
+  .facet-group { padding: 0 20px 20px; }
+  .facet-group-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 9px; }
+  .facet-row {
+    display: flex; align-items: center; gap: 9px; width: 100%;
+    padding: 7px 8px; margin: 0 -8px 2px; border-radius: 5px; border: none;
+    background: none; cursor: pointer; text-align: left;
+    font-family: var(--sans); font-size: 13px; color: var(--ink-2);
+  }
+  .facet-row:hover { background: var(--hover-wash); color: var(--ink); }
+  .facet-row.on { background: var(--ink); color: var(--bg); }
+  .facet-swatch { width: 9px; height: 9px; border-radius: 2.5px; flex: 0 0 auto; }
+  .facet-row-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .facet-row-count { font-family: var(--mono); font-size: 10.5px; color: var(--ink-4); }
+  .facet-row.on .facet-row-count { color: rgba(255,255,255,0.6); }
+  .facet-tags { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 20px 20px; margin-top: -20px; }
+  .facet-tag {
+    padding: 5px 9px; border-radius: 999px; border: 1px solid var(--line-strong);
+    background: none; color: var(--ink-2); cursor: pointer;
+    font-family: var(--mono); font-size: 10.5px; font-weight: 500;
+  }
+  .facet-tag.on { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+  .facet-sep { height: 1px; margin: 0 20px 20px; background: var(--line); }
+
+  @media (min-width: 800px) {
+    .work-layout { display: flex; align-items: flex-start; }
+    .facet-rail {
+      display: block; width: 228px; flex: 0 0 auto; align-self: flex-start;
+      position: sticky; top: 60px; max-height: calc(100dvh - 60px); overflow-y: auto;
+      border-right: 1px solid var(--line); background: var(--surface);
+      padding: 20px 0; margin-right: 32px;
+    }
+    .facet-rail .facet-group, .facet-rail .facet-sep, .facet-rail .facet-tags { padding-inline: 20px; }
+    .facet-rail .facet-tags { margin-top: -20px; }
+    .filters-fab { display: none; }
+    .work-body { flex: 1; min-width: 0; }
+  }
+
   .work-head-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
   .work-cta {
     height: 34px; padding: 0 12px; border-radius: 5px; cursor: pointer;
@@ -668,9 +720,43 @@
      two shapes, same URL — the pattern Roseberry Planner already uses.
      ═══════════════════════════════════════════════════════════════════════ */
   @media (min-width: 800px) {
-    :root { --rail: 64px; --rail-open: 236px; }
+    :root { --rail: 64px; --rail-open: 236px; --rail-slot: var(--rail); }
 
-    body { padding: 0 0 0 var(--rail); }
+    body { padding: 0 0 0 var(--rail-slot); }
+
+    /* ── Topbar ──────────────────────────────────────────────────────── */
+    .topbar {
+      display: flex; align-items: center; gap: 18px;
+      height: 60px; flex: 0 0 auto; padding: 0 26px;
+      position: sticky; top: 0; z-index: 30;
+      border-bottom: 1px solid var(--line); background: var(--bg);
+    }
+    .topbar-crumb {
+      display: flex; align-items: baseline; gap: 9px;
+      font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;
+      color: var(--ink); white-space: nowrap;
+    }
+    .topbar-crumb .dim { color: var(--ink-3); }
+    .topbar-search {
+      margin-left: auto; display: flex; align-items: center; gap: 9px;
+      width: 300px; height: 34px; padding: 0 11px; border-radius: 5px;
+      border: 1px solid var(--line-strong); background: var(--surface);
+      color: var(--ink-3); cursor: pointer;
+      font-family: var(--sans); font-size: 13px;
+    }
+    .topbar-search:hover { border-color: var(--ink-3); color: var(--ink-2); }
+    .topbar-kbd {
+      font-family: var(--mono); font-size: 10px; line-height: 1; color: var(--ink-3);
+      border: 1px solid var(--line); border-radius: 3px; padding: 3px 4px; background: var(--bg);
+    }
+    .topbar-capture {
+      display: flex; align-items: center; gap: 7px; height: 34px; padding: 0 12px;
+      border-radius: 5px; border: 1px solid var(--line-strong); background: none;
+      color: var(--ink-2); cursor: pointer;
+      font-family: var(--mono); font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.09em;
+    }
+    .topbar-capture:hover { border-color: var(--ink-3); color: var(--ink); }
+    .topbar.hidden { display: none; }
 
     /* The phone's bottom bar and floating button belong to the narrow shell. */
     nav.bar, .fab { display: none !important; }
@@ -684,8 +770,11 @@
       transition: width 0.2s ease-out;
     }
     /* Expands on hover to reveal labels, then collapses again — the content
-       column keeps the collapsed width, so nothing reflows underneath. */
-    .rail:hover, .rail:focus-within { width: var(--rail-open); }
+       column keeps the collapsed width, so nothing reflows underneath.
+       Pinning (the footer's pin button, or `[`) widens the SLOT itself
+       (--rail-slot, set on body's padding-left) so the rail pushes layout
+       instead of overlaying it, and stays open without a hover. */
+    .rail:hover, .rail:focus-within, .rail.pinned { width: var(--rail-open); }
 
     .rail-head {
       display: flex; align-items: center; gap: 12px;
@@ -724,15 +813,40 @@
     }
     /* Labels fade in with the rail rather than appearing mid-slide. */
     .rail-item .label { opacity: 0; transition: opacity 0.1s; }
-    .rail:hover .rail-item .label,
-    .rail:focus-within .rail-item .label { opacity: 1; }
+    .rail:hover .rail-item .label, .rail:focus-within .rail-item .label,
+    .rail.pinned .rail-item .label { opacity: 1; }
 
-    .rail-item[aria-current="true"] { color: var(--ink); }
+    .rail-item[aria-current="true"] { color: var(--ink); font-weight: 600; }
     .rail-item[aria-current="true"]::before {
       content: ''; position: absolute; left: 0; top: 8px; bottom: 8px;
       width: 2px; background: var(--accent);
     }
     .rail-item.cta { color: var(--accent); }
+
+    /* Collapsed: a dot on the icon keeps the unread signal visible. Expanded:
+       a numeric badge takes over and the dot hides. */
+    .rail-dot {
+      position: absolute; top: -1px; right: -1px; width: 7px; height: 7px;
+      border-radius: 999px; background: var(--ink); border: 1px solid var(--surface);
+    }
+    .rail-dot.accent { background: var(--accent); }
+    .rail-item .glyph { position: relative; }
+    .rail:hover .rail-dot, .rail:focus-within .rail-dot, .rail.pinned .rail-dot { opacity: 0; }
+    .rail-badge {
+      margin-left: auto; font-family: var(--mono); font-size: 10px; line-height: 1;
+      padding: 3px 6px; border-radius: 999px; background: var(--ink); color: var(--bg);
+      opacity: 0; transition: opacity 0.1s;
+    }
+    .rail-badge.accent { background: var(--accent); }
+    .rail:hover .rail-badge, .rail:focus-within .rail-badge, .rail.pinned .rail-badge { opacity: 1; }
+
+    .rail-account {
+      margin-top: 4px; padding: 8px 21px 2px; border-top: 1px solid var(--line);
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      opacity: 0; transition: opacity 0.1s;
+    }
+    .rail-account .eyebrow { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rail:hover .rail-account, .rail:focus-within .rail-account, .rail.pinned .rail-account { opacity: 1; }
 
     .rail-sep { height: 1px; margin: 8px 21px; background: var(--line); }
 
@@ -781,6 +895,7 @@
 
 <section id="auth" class="hidden"></section>
 
+<header id="topbar" class="topbar hidden"></header>
 <main id="main" class="hidden"></main>
 
 <button id="fab" class="fab hidden" type="button" aria-label="Capture">
