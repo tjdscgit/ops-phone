@@ -9,6 +9,7 @@ import { route, startRouter, go, currentPath } from './lib/router.js';
 import { listView, formView } from './lib/engine.js';
 import { byKey, GROUPS } from './schema.js';
 import { todayView } from './views/today.js';
+import { workView } from './views/work.js';
 import { tasksList, taskForm } from './views/tasks.js';
 import { routinesList, routineForm } from './views/routines.js';
 import { captureView } from './views/capture.js';
@@ -18,6 +19,7 @@ import { enablePush, pushStatus } from './views/push.js';
 // ─── Routes ──────────────────────────────────────────────────────────────
 
 route('/today', todayView);
+route('/work', workView);
 route('/capture', captureView);
 route('/settings', settingsView);
 
@@ -82,7 +84,7 @@ const ICONS = {
 
 const TABS = [
   { href: '#/today', label: 'Today', icon: 'today' },
-  { href: '#/g/work', label: 'Work', icon: 'work' },
+  { href: '#/work', label: 'Work', icon: 'work' },
   { href: '#/c/content', label: 'Content', icon: 'content' },
   { href: '#/g/people', label: 'People', icon: 'people' },
   { href: '#/g/library', label: 'Library', icon: 'library' },
