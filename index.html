@@ -361,6 +361,82 @@
   .pill.solid { color: var(--bg);     background: var(--accent);      border-color: var(--accent); }
   .pill.plain { color: var(--ink-2);  background: var(--surface-2);   border-color: transparent; }
 
+  /* ── The Briefing (Today) ───────────────────────────────────────────── */
+  /* Ported from the dashboard's /today page.tsx + brief-line.tsx: masthead
+     pill row, a two-column ledger + sticky ambient rail on desktop
+     (stacked on the phone), and the editorial brief-line cards with their
+     three-segment cadence bar. */
+
+  .briefing-head .row-actions { align-items: flex-end; }
+  .briefing-pills { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-bottom: 2px; }
+
+  .briefing-focus { padding: 12px 20px 0; font-family: var(--sans); font-size: 14px; color: var(--ink); }
+  .briefing-focus .eyebrow { color: var(--ink-3); }
+  .briefing-focus .dim { color: var(--ink-3); }
+
+  .briefing-anchor { margin: 10px 20px 0; font-family: var(--sans); font-size: 12px; line-height: 1.5; color: var(--ink-2); }
+  .briefing-anchor .over { color: var(--accent); }
+
+  .briefing-inbox {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+    width: calc(100% - 40px); margin: 18px 20px 0; padding: 10px 0 10px 12px;
+    border-left: 2px solid var(--accent); background: none; border-top: none; border-right: none; border-bottom: none;
+    cursor: pointer; text-align: left;
+  }
+  .briefing-inbox:hover { background: rgba(224,98,63,0.04); }
+
+  .briefing-grid { margin-top: 22px; }
+  .briefing-left { min-width: 0; }
+  .briefing-right { margin-top: 28px; }
+
+  .briefing-section { padding: 0 20px; margin-top: 30px; }
+  .briefing-section:first-child { margin-top: 0; }
+  .briefing-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+  .briefing-empty { font-family: var(--serif); font-size: 14px; font-style: italic; line-height: 1.5; color: var(--ink-2); margin: 0; }
+
+  .brief-card {
+    display: block; width: 100%; text-align: left; cursor: pointer;
+    border: 1px solid var(--line); border-radius: 5px; background: var(--bg);
+    padding: 14px; color: inherit; font: inherit;
+    transition: border-color 0.12s;
+  }
+  .brief-card:hover { border-color: var(--line-strong); }
+
+  .cadence-bar { position: relative; height: 3px; background: var(--line-strong); margin-top: 2px; }
+  .cadence-fill { position: absolute; left: 0; top: 0; height: 100%; background: var(--ink-3); }
+  .cadence-over { position: absolute; top: 0; height: 100%; background: var(--accent); }
+  .cadence-tick { position: absolute; top: -2px; height: 7px; width: 1px; background: var(--ink-2); }
+
+  .urgency-dot { width: 8px; height: 8px; border-radius: 999px; flex: 0 0 auto; margin-top: 6px; background: var(--ink-3); }
+  .urgency-dot.high { background: var(--accent); }
+  .urgency-dot.normal { background: var(--ink-2); }
+
+  .briefing-reflection, .briefing-quote {
+    margin: 30px 20px 0; padding: 20px; background: var(--surface);
+    border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  }
+  .briefing-quote { background: none; border: 1px solid var(--line); border-radius: 0; }
+
+  .briefing-event { display: flex; align-items: baseline; gap: 14px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+
+  .item-title.done { color: var(--ink-3); text-decoration: line-through; }
+
+  .briefing-capture { padding: 0 20px; margin-top: 30px; }
+  .capture-chip {
+    flex: 0 0 auto; height: 30px; padding: 0 12px; border-radius: 5px;
+    border: 1px solid var(--line); background: none; color: var(--ink-2); cursor: pointer;
+    font-family: var(--sans); font-size: 12px; font-weight: 500;
+  }
+  .capture-chip:hover { color: var(--ink); border-color: var(--line-strong); }
+
+  @media (min-width: 800px) {
+    .briefing-focus, .briefing-anchor, .briefing-section, .briefing-capture { padding-inline: 0; }
+    .briefing-inbox { width: 100%; margin-inline: 0; }
+    .briefing-reflection, .briefing-quote { margin-inline: 0; }
+    .briefing-grid { display: grid; grid-template-columns: minmax(0,1fr) 348px; gap: 0 40px; align-items: start; }
+    .briefing-right { margin-top: 0; position: sticky; top: 76px; }
+  }
+
   /* ── Work pulse board ───────────────────────────────────────────────── */
   /* Ported from the dashboard's /work screen: domain sections carry a
      colour swatch, project cards carry a colour bar + progress, content
