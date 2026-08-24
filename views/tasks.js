@@ -96,7 +96,7 @@ export async function tasksList(mount) {
     const f = FILTERS[state.filter];
 
     let q = f.apply(sb.from('tasks').select(
-      'id, title, status, due_date, due_time, priority, domain_id, project_id, waiting_on, completed_at',
+      'id, title, status, due_date, due_time, priority, domain_id, project_id, waiting_on, completed_at, top3_for_date',
     ));
     if (state.q) {
       const safe = state.q.replace(/[,()]/g, ' ');
@@ -126,7 +126,7 @@ export async function tasksList(mount) {
 
 // A row is a tick box plus a tappable body. The two are separate controls so
 // that completing a task can never be mistaken for opening it.
-export function taskRow(t, refresh) {
+export function taskRow(t, refresh, opts = {}) {
   const done = t.status === 'done';
   const waiting = t.status === 'waiting';
   const urgency = urgencyOf(t.due_date, t.status);
@@ -169,7 +169,23 @@ export function taskRow(t, refresh) {
   if (duePill) meta.append(duePill);
   for (const b of bits) meta.append(el('span', {}, b));
 
-  return el('div', { class: `item row-item ${done ? 'done' : ''}` },
+  // Top 3 — the dashboard's star. Pinning writes today's date into
+  // top3_for_date, which is what the briefing reads to build the day's strip.
+  const isTop3 = t.top3_for_date === today();
+  const star = done ? null : el('button', {
+    class: `star ${isTop3 ? 'on' : ''}`, type: 'button',
+    'aria-label': isTop3 ? 'Remove from Top 3' : 'Add to Top 3',
+    onclick: async (e) => {
+      e.stopPropagation();
+      const { error } = await sb.from('tasks')
+        .update({ top3_for_date: isTop3 ? null : today() }).eq('id', t.id);
+      if (error) { fail(error); return; }
+      toast(isTop3 ? 'Unpinned' : 'Pinned for today');
+      refresh?.();
+    },
+  }, isTop3 ? '★' : '☆');
+
+  return el('div', { class: `item row-item ${done ? 'done' : ''} ${opts.pinned ? 'pinned' : ''}` },
     box,
     el('button', {
       class: 'item-body', type: 'button',
@@ -181,6 +197,7 @@ export function taskRow(t, refresh) {
       }, t.title),
       meta,
     ),
+    star,
   );
 }
 

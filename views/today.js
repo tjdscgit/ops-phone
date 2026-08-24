@@ -1,77 +1,77 @@
-// Today — the home screen.
+// Today — the editorial home screen.
 //
-// Everything here is something you'd want to see before deciding what to do
-// next: what you said mattered today, what the system flagged, what's due,
-// what's on, and which routines are still outstanding. It's assembled from
-// six tables in one parallel fetch so the screen paints once rather than
-// filling in piece by piece.
+// Ported from the dashboard's Today page: a masthead with an anchor line, a
+// newspaper column of brief lines about what's slipping, then the things you
+// act on. The dashboard's tone rule holds here — brief lines state facts, not
+// advice: "23 days since a journal entry", never "you should journal more".
+//
+// Everything on it comes from one parallel batch (see lib/briefing.js) so the
+// screen paints once rather than filling in piece by piece.
 
 import { sb, ref, refName } from '../lib/db.js';
 import {
-  el, panel, hint, chips, toast, fail, spinner,
+  el, hint, chips, toast, fail, spinner,
   screenHead, sectionLabel, pill, tickBox,
-  today, ymd, addDays, niceStamp, humanise,
+  today, ymd, addDays, niceStamp, hhmm, humanise,
 } from '../lib/ui.js';
 import { go } from '../lib/router.js';
+import { loadBriefing } from '../lib/briefing.js';
 import { taskRow } from './tasks.js';
 
 export async function todayView(mount) {
   const now = new Date();
-  const head = screenHead(
-    now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }),
-    greeting(),
+  mount.replaceChildren(
+    screenHead(
+      now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }),
+      greeting(),
+    ),
+    spinner(),
   );
-  mount.replaceChildren(head, spinner());
+
+  let b;
+  try {
+    b = await loadBriefing();
+  } catch (err) {
+    mount.lastChild.replaceWith(hint(err?.message || String(err)));
+    return;
+  }
 
   const t = today();
-  const dayStart = new Date(t + 'T00:00:00').toISOString();
-  const dayEnd = new Date(t + 'T23:59:59').toISOString();
-
-  const [tasksRes, focusRes, attnRes, eventsRes, routinesRes, doneRes] = await Promise.all([
-    sb.from('tasks')
-      .select('id, title, status, due_date, due_time, priority, domain_id, project_id, waiting_on, completed_at')
-      .eq('status', 'open').not('due_date', 'is', null).lte('due_date', t)
-      .order('due_date', { ascending: true }).order('priority', { ascending: true }),
-    sb.from('daily_focus').select('*').eq('date', t),
-    sb.from('attention_items').select('*')
-      .eq('status', 'active')
-      // A snoozed item is one you've already decided about; or() keeps rows
-      // that were never snoozed alongside those whose snooze has run out.
-      .or(`snoozed_until.is.null,snoozed_until.lte.${t}`)
-      .order('score', { ascending: false, nullsFirst: false })
-      .limit(10),
-    sb.from('calendar_events').select('*')
-      .lte('start_at', dayEnd).gte('end_at', dayStart)
-      .order('start_at'),
-    sb.from('routines').select('id, name, time_of_day, goal_days')
-      .is('archived_at', null).eq('active', true)
-      .order('position', { ascending: true, nullsFirst: false }).order('name'),
-    sb.from('routine_completions').select('routine_id, completed_date')
-      .eq('completed_date', t),
-  ]);
-
   const body = el('div', { class: 'screen' });
+  const reload = () => go('#/today');
 
-  body.append(focusBlock(focusRes.data ?? [], t));
+  // ── Anchor line ────────────────────────────────────────────────────────
+  // One sentence of orientation under the masthead, the way the dashboard
+  // leads: what's on, what's set, what's waiting to be triaged.
+  const anchor = anchorLine(b);
+  if (anchor) body.append(el('p', { class: 'anchor' }, ...anchor));
 
-  // Flagged items come before the task list: the point of the attention rules
-  // is to surface something you would not otherwise have gone looking for.
-  const attn = attnRes.data ?? [];
+  // ── Brief lines ────────────────────────────────────────────────────────
+  if (b.briefLines.length) {
+    body.append(sectionLabel('Slipping'));
+    const col = el('div', { class: 'brief' });
+    for (const line of b.briefLines) col.append(briefLine(line));
+    body.append(col);
+  }
+
+  // ── Focus ──────────────────────────────────────────────────────────────
+  body.append(focusBlock(t));
+
+  // ── Attention ──────────────────────────────────────────────────────────
+  const attn = await loadAttention(t);
   if (attn.length) {
     body.append(
-      sectionLabel('Needs attention'),
-      el('div', { class: 'list' }, ...attn.map((a) => attentionRow(a))),
+      sectionLabel('Needs attention', pill('quiet', String(attn.length), false)),
+      el('div', { class: 'list' }, ...attn.map(attentionRow)),
     );
   }
 
-  const events = eventsRes.data ?? [];
-  if (events.length) {
+  // ── On today ───────────────────────────────────────────────────────────
+  if (b.events.length) {
     body.append(
       sectionLabel('On today'),
-      el('div', { class: 'list' }, ...events.map((e) =>
-        el('button', {
-          class: 'item', type: 'button', onclick: () => go(`#/c/calendar/${e.id}`),
-        },
+      el('div', { class: 'list' }, ...b.events.map((e) =>
+        el('button', { class: 'item', type: 'button', onclick: () => go(`#/c/calendar/${e.id}`) },
           el('div', { class: 'item-title serif' }, e.title),
           el('div', { class: 'item-meta' },
             e.all_day ? 'All day' : niceStamp(e.start_at),
@@ -80,14 +80,20 @@ export async function todayView(mount) {
     );
   }
 
-  const tasks = tasksRes.data ?? [];
-  const overdue = tasks.filter((x) => x.due_date < t);
-  const due = tasks.filter((x) => x.due_date === t);
-
-  if (overdue.length) {
+  // ── Tasks ──────────────────────────────────────────────────────────────
+  if (b.tasks.overdue.length) {
     body.append(
-      sectionLabel('Overdue', pill('over', String(overdue.length), false)),
-      el('div', { class: 'list' }, ...overdue.map((x) => taskRow(x, reload))),
+      sectionLabel('Overdue', pill('over', String(b.tasks.overdue.length), false)),
+      el('div', { class: 'list' }, ...b.tasks.overdue.map((x) => taskRow(x, reload))),
+    );
+  }
+
+  // Pinned tasks are the dashboard's Top 3 — the day's stated intent, so they
+  // sit above the rest of the due list rather than mixed into it.
+  if (b.tasks.top3.length) {
+    body.append(
+      sectionLabel('Top 3', pill('quiet', `${b.tasks.top3.length}/3`, false)),
+      el('div', { class: 'list' }, ...b.tasks.top3.map((x) => taskRow(x, reload, { pinned: true }))),
     );
   }
 
@@ -97,42 +103,108 @@ export async function todayView(mount) {
         class: 'icon-btn', type: 'button', 'aria-label': 'New task',
         onclick: () => go('#/tasks/new'),
       }, '+')),
-    due.length
-      ? el('div', { class: 'list' }, ...due.map((x) => taskRow(x, reload)))
-      : hint(tasksRes.error ? tasksRes.error.message : 'Nothing due today.'),
+    b.tasks.dueToday.length
+      ? el('div', { class: 'list' }, ...b.tasks.dueToday.map((x) => taskRow(x, reload)))
+      : hint('Nothing due today.'),
   );
 
-  // Routines are last and collapsed to the outstanding ones — once they're
-  // all ticked the section disappears, which is the reward.
-  const routines = routinesRes.data ?? [];
-  const doneToday = new Set((doneRes.data ?? []).map((c) => c.routine_id));
-  const outstanding = routines.filter((r) => !doneToday.has(r.id));
-
-  if (routines.length) {
+  // ── Routines ───────────────────────────────────────────────────────────
+  const r = b.routines;
+  if (r.all.length) {
     body.append(
       sectionLabel('Routines',
-        pill(outstanding.length ? 'quiet' : 'ok',
-          `${routines.length - outstanding.length}/${routines.length}`, false)),
-      outstanding.length
-        ? el('div', { class: 'list' }, ...outstanding.map((r) => quickRoutine(r, t, reload)))
+        pill(r.remaining.length ? 'quiet' : 'ok', `${r.done}/${r.all.length}`, false)),
+      r.remaining.length
+        ? el('div', { class: 'list' }, ...r.remaining.map((x) => quickRoutine(x, t, reload)))
         : hint('All done today.'),
     );
   }
 
-  mount.lastChild.replaceWith(body);
+  // ── Latest quote ───────────────────────────────────────────────────────
+  // The newest quote in the library, and it stays put until a newer one is
+  // saved — not a daily rotation.
+  if (b.latestQuote) {
+    const q = b.latestQuote;
+    const attrib = [q.source_author, q.source_reference].filter(Boolean).join(', ');
+    body.append(
+      sectionLabel('From the library'),
+      el('button', {
+        class: 'item quote', type: 'button', onclick: () => go(`#/c/quotes/${q.id}`),
+      },
+        el('div', { class: 'quote-text' }, q.text),
+        attrib ? el('div', { class: 'item-meta' }, attrib) : null,
+      ),
+    );
+  }
 
-  function reload() { go('#/today'); }
+  mount.lastChild.replaceWith(body);
+}
+
+// ─── Anchor line ─────────────────────────────────────────────────────────
+
+function anchorLine(b) {
+  const parts = [];
+
+  if (b.events.length) {
+    const e = b.nextEvent;
+    const when = e.all_day ? 'all day' : hhmm(new Date(e.start_at).toTimeString().slice(0, 5));
+    parts.push(
+      el('span', {}, `${b.events.length} event${b.events.length === 1 ? '' : 's'} today`),
+      el('span', { class: 'dim' }, ' — next '),
+      el('b', {}, `${when} ${e.title}`),
+      el('span', {}, '. '),
+    );
+  }
+
+  const due = b.tasks.dueToday.length + b.tasks.top3.length;
+  if (due) parts.push(el('span', {}, `${due} task${due === 1 ? '' : 's'} set. `));
+  if (b.tasks.overdue.length) {
+    parts.push(el('b', { class: 'over' }, `${b.tasks.overdue.length} overdue. `));
+  }
+  if (b.inboxCount) {
+    parts.push(el('button', {
+      class: 'linkish', type: 'button', onclick: () => go('#/tasks'),
+    }, `${b.inboxCount} in the inbox to sort.`));
+  }
+
+  return parts.length ? parts : null;
+}
+
+// ─── Brief line ──────────────────────────────────────────────────────────
+// Big metric, small unit, the domain it belongs to, when it last happened,
+// and the one action it offers.
+
+function briefLine(line) {
+  return el('button', {
+    class: `brief-line ${line.status}`, type: 'button',
+    onclick: () => go(line.href),
+  },
+    el('div', { class: 'brief-metric' },
+      el('span', { class: 'big' }, line.big ?? String(line.metric)),
+      el('span', { class: 'unit' }, line.unit),
+    ),
+    el('div', { class: 'brief-body' },
+      el('div', { class: 'brief-name' },
+        line.name,
+        line.status === 'slip'
+          ? pill('over', `${line.cadence}d cadence`)
+          : pill('due', `${line.cadence}d cadence`),
+      ),
+      line.last ? el('div', { class: 'item-meta' }, line.last) : null,
+      el('div', { class: 'brief-next' }, line.next, el('span', { class: 'arrow' }, '→')),
+    ),
+  );
 }
 
 // ─── Focus ───────────────────────────────────────────────────────────────
-// daily_focus is keyed by (date, target_type, target_id) and points at a
-// project or a content item — it's "the thing today is really about", not a
-// free-text note.
 
-function focusBlock(rows, t) {
+function focusBlock(t) {
   const wrap = el('div', {});
 
-  const render = () => {
+  const render = async () => {
+    wrap.replaceChildren(sectionLabel("Today's focus"), spinner());
+    const { data } = await sb.from('daily_focus').select('*').eq('date', t);
+    const rows = data ?? [];
     wrap.replaceChildren(sectionLabel("Today's focus"));
 
     if (rows.length) {
@@ -141,7 +213,6 @@ function focusBlock(rows, t) {
         const label = f.target_type === 'project'
           ? refName('project', f.target_id)
           : refName('contentItem', f.target_id);
-
         list.append(el('div', { class: 'item row-item' },
           el('div', { class: 'item-body static' },
             el('div', { class: 'item-title serif' }, label || '(missing)'),
@@ -153,7 +224,6 @@ function focusBlock(rows, t) {
               const { error } = await sb.from('daily_focus').delete()
                 .eq('date', t).eq('target_type', f.target_type).eq('target_id', f.target_id);
               if (error) { fail(error); return; }
-              rows.splice(rows.indexOf(f), 1);
               render();
             },
           }, '×'),
@@ -163,8 +233,6 @@ function focusBlock(rows, t) {
       return;
     }
 
-    // Nothing set yet: offer the pickers rather than an empty slot, since
-    // setting focus is a morning action and should be one tap away.
     const choices = [
       ...ref.projects.filter((p) => p.status === 'active')
         .map((p) => ({ value: `project:${p.id}`, label: p.name })),
@@ -177,25 +245,30 @@ function focusBlock(rows, t) {
       return;
     }
 
-    wrap.append(
-      el('div', { class: 'controls' },
-        chips(choices, null, async (val) => {
-          const [target_type, target_id] = val.split(':');
-          const { error } = await sb.from('daily_focus')
-            .insert({ date: t, target_type, target_id });
-          if (error) { fail(error); return; }
-          rows.push({ date: t, target_type, target_id });
-          toast('Focus set');
-          render();
-        })),
-    );
+    wrap.append(el('div', { class: 'controls' },
+      chips(choices, null, async (val) => {
+        const [target_type, target_id] = val.split(':');
+        const { error } = await sb.from('daily_focus').insert({ date: t, target_type, target_id });
+        if (error) { fail(error); return; }
+        toast('Focus set');
+        render();
+      })));
   };
 
   render();
   return wrap;
 }
 
-// ─── Attention items ─────────────────────────────────────────────────────
+// ─── Attention ───────────────────────────────────────────────────────────
+
+async function loadAttention(t) {
+  const { data } = await sb.from('attention_items').select('*')
+    .eq('status', 'active')
+    .or(`snoozed_until.is.null,snoozed_until.lte.${t}`)
+    .order('score', { ascending: false, nullsFirst: false })
+    .limit(10);
+  return data ?? [];
+}
 
 function attentionRow(a) {
   const act = async (patch, msg) => {
@@ -223,8 +296,6 @@ function attentionRow(a) {
       }, 'Done'),
       el('button', {
         class: 'ghost small',
-        // Snoozing to tomorrow rather than dismissing: most of these are
-        // "not now" rather than "never".
         onclick: () => act({ status: 'snoozed', snoozed_until: ymd(addDays(new Date(), 1)) }, 'Snoozed'),
       }, 'Snooze'),
       el('button', {
@@ -255,8 +326,6 @@ function quickRoutine(r, t, refresh) {
     ),
   );
 }
-
-// ─── Helpers ─────────────────────────────────────────────────────────────
 
 function greeting() {
   const h = new Date().getHours();

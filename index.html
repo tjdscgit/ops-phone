@@ -250,6 +250,81 @@
   }
   .item-body.static { cursor: default; }
 
+  /* ── Anchor line ─────────────────────────────────────────────────────── */
+  /* One sentence of orientation under the masthead — what's on, what's set,
+     what's waiting. Serif, because it reads as a sentence, not as chrome. */
+  .anchor {
+    margin: 0; padding: 0 20px 4px;
+    font-family: var(--serif); font-size: 17px; line-height: 1.5;
+    color: var(--ink-2);
+  }
+  .anchor b { font-weight: 500; color: var(--ink); }
+  .anchor b.over { color: var(--accent); }
+  .anchor .dim { color: var(--ink-3); }
+  .linkish {
+    background: none; border: none; padding: 0; cursor: pointer;
+    font: inherit; color: var(--ink-2);
+    text-decoration: underline; text-underline-offset: 3px;
+    text-decoration-color: var(--line-strong);
+  }
+  .linkish:hover { color: var(--accent); }
+
+  /* ── Brief lines ─────────────────────────────────────────────────────── */
+  /* A newspaper column: big metric, small unit, then the fact and the one
+     action it offers. Facts only — the tone rule is no advice. */
+  .brief { border-top: 1px solid var(--line); }
+  .brief-line {
+    display: flex; align-items: flex-start; gap: 16px;
+    width: 100%; text-align: left; cursor: pointer;
+    background: none; border: none; border-bottom: 1px solid var(--line);
+    padding: 16px 20px; color: var(--ink); font: inherit;
+    transition: background 0.12s;
+  }
+  .brief-line:active { background: var(--active-wash); }
+  @media (hover: hover) { .brief-line:hover { background: var(--hover-wash); } }
+
+  .brief-metric {
+    flex: 0 0 74px; display: flex; flex-direction: column; align-items: flex-start;
+  }
+  .brief-metric .big {
+    font-family: var(--serif); font-size: 34px; line-height: 1;
+    font-weight: 500; letter-spacing: -0.02em; color: var(--ink-3);
+  }
+  .brief-line.slip .brief-metric .big { color: var(--accent); }
+  .brief-line.stale .brief-metric .big { color: var(--warn); }
+  .brief-metric .unit {
+    margin-top: 5px;
+    font-family: var(--mono); font-size: 9px; line-height: 1.3;
+    letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3);
+  }
+
+  .brief-body { flex: 1; min-width: 0; }
+  .brief-name {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    font-family: var(--serif); font-size: 17px; letter-spacing: -0.01em;
+  }
+  .brief-next {
+    margin-top: 8px; display: flex; align-items: center; gap: 6px;
+    font-family: var(--sans); font-size: 13px; color: var(--ink-2);
+  }
+  .brief-next .arrow { color: var(--ink-3); }
+
+  /* ── Top 3 star ──────────────────────────────────────────────────────── */
+  .star {
+    flex: 0 0 auto; background: none; border: none; cursor: pointer;
+    padding: 0 0 0 8px; font-size: 16px; line-height: 1;
+    color: var(--ink-4); font-family: var(--sans);
+  }
+  .star.on { color: var(--accent); }
+  .row-item.pinned { background: var(--accent-soft); }
+
+  /* ── Library quote ───────────────────────────────────────────────────── */
+  .quote-text {
+    font-family: var(--serif); font-size: 19px; line-height: 1.45;
+    letter-spacing: -0.01em; color: var(--ink);
+  }
+  .item.quote .item-meta { margin-top: 8px; }
+
   /* ── Checkbox ────────────────────────────────────────────────────────── */
   /* 20px, square, hairline border — deliberately not a rounded green tick.
      Done fills with ink-2 and shows a canvas-coloured check. */
@@ -580,6 +655,11 @@
     .controls input[type="search"] { width: 280px; }
 
     .toast { left: auto; right: 24px; bottom: 24px; max-width: 380px; }
+
+    .anchor { padding-inline: 0; font-size: 19px; max-width: 720px; }
+    .brief-line { padding-inline: 0; }
+    .brief-metric { flex-basis: 92px; }
+    .brief-metric .big { font-size: 42px; }
 
     /* The More sheet is a phone affordance; the rail lists everything. */
     .sheet, .sheet-scrim { display: none !important; }

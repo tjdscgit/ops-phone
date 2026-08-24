@@ -73,7 +73,8 @@ is what makes "edit, push, done" possible with no toolchain.
 | `lib/router.js` | Hash router |
 | `lib/engine.js` | Generic list + form rendering, driven by `schema.js` |
 | `lib/ui.js` | Element helpers, date formatting, chips, toasts |
-| `views/today.js` | Home screen: focus, attention, events, due tasks, routines |
+| `lib/briefing.js` | Domain cadence + the Today briefing (ported from the API) |
+| `views/today.js` | Home screen: briefing, focus, attention, tasks, routines |
 | `views/tasks.js` | Task list and editor |
 | `views/routines.js` | Daily tick list and streaks |
 | `views/capture.js` | One-screen quick capture |
@@ -106,6 +107,33 @@ here is to build broadly, find what actually gets used, and cut the rest.
 
 Only Today, Tasks and Routines are hand-written, because they act on rows
 (ticking, snoozing) rather than just opening them.
+
+## The briefing
+
+`lib/briefing.js` is a port of the dashboard's `lib/cadence.ts` and
+`/api/briefing/today` — the source of truth for the editorial home screen. Each
+domain declares a cadence rule in its `failure_patterns` jsonb
+(`days_since_journal`, `days_since_publish`, `no_activity_days`); the port runs
+the matching "latest date" rollup and turns it into a fact: **30 days since
+project activity**, against a 7-day cadence, so Growing is slipping.
+
+Past the threshold is a **slip**; three-quarters of the way is **stale**;
+anything below that is quiet and does not surface. Today leads with what's
+behind, not with a status board of everything that's fine. The tone rule from
+the dashboard holds: brief lines state facts, never advice.
+
+It runs in the browser because none of it needs a secret — every query is one
+the signed-in user is already entitled to make.
+
+**Two deliberate departures**, both because the dashboard is wrong against this
+database:
+
+1. It reads `routines.last_done_date`, a column that does not exist here.
+   Completion lives in `routine_completions`, keyed by date, so that is what
+   this uses. On the dashboard every routine reads as still outstanding.
+2. It anchors the day's event window to `T00:00:00Z` — UTC, ten hours out in
+   this timezone, so evening events land on the wrong day. This uses local
+   midnight, like the rest of the app.
 
 Every `chips` field's options are copied from that column's CHECK constraint in
 Postgres. Inventing a value that isn't in the constraint fails the insert, so
