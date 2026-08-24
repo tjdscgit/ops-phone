@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Roseberry Ops</title>
 <link rel="manifest" href="./manifest.json">
-<meta name="theme-color" content="#1a1714">
+<meta name="theme-color" content="#131211">
 <link rel="apple-touch-icon" href="./icon-192.png">
 
 <!-- The design's three faces. Loaded from Google Fonts because there is no
@@ -38,17 +38,23 @@
   :root {
     color-scheme: dark;
 
-    --bg: #1a1714;
-    --surface: #221e19;
-    --surface-2: #2c2620;
-    --surface-3: #362f27;
+    /* Deepened to a near-black ground (the dashboard's dark is a lighter,
+       browner brown). The warmth is dialled right back — just enough that the
+       rust accent still belongs — so this reads as proper dark rather than
+       dark-brown. Layer separation is preserved: bg->surface contrast is
+       1.076:1, matching the original 1.077:1. */
+    --bg: #131211;
+    --surface: #1b1a18;
+    --surface-2: #232220;
+    --surface-3: #2b2a27;
 
-    --ink: #f3efe7;
-    --ink-2: #c5beb1;
-    --ink-3: #948c7e;
-    /* ink-3 is the floor for TEXT. ink-4 is non-text only — empty checkbox
-       borders, disabled glyphs, hairline outlines. */
-    --ink-4: #635c51;
+    /* Warmed a shade against the deeper ground. All of these clear WCAG AA on
+       both --bg and --surface; ink-3 is the floor for TEXT at 5.26:1. ink-4 is
+       non-text only — empty checkbox borders, disabled glyphs, hairlines. */
+    --ink: #f2efe9;
+    --ink-2: #c4beb2;
+    --ink-3: #8e877b;
+    --ink-4: #58524a;
 
     --line: rgba(243, 239, 231, 0.1);
     --line-strong: rgba(243, 239, 231, 0.18);

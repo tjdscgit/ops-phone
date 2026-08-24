@@ -30,6 +30,14 @@ phone and the dashboard are demonstrably the same product:
 deliberate — this gets used outdoors and before dawn. Both palettes are the
 same design, and the toggle is in More → Settings, remembered per device.
 
+The dark ground is deeper than the dashboard's, and less brown: `#131211`
+rather than `#1a1714`. The dashboard's dark was designed as the second half of
+a light-first desktop theme; on a phone at night it reads washed out. The
+warmth is dialled back just far enough that the rust accent still belongs.
+Layer separation is preserved (bg->surface 1.076:1, against the original
+1.077:1) and every text colour clears WCAG AA on both `--bg` and `--surface`,
+with `ink-3` the floor at 5.26:1.
+
 ## One app, two shapes
 
 There is no separate desktop build. The same files rearrange themselves at
