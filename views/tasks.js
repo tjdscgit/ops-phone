@@ -521,11 +521,24 @@ export async function taskForm(mount, { id }) {
 
   const save = el('button', { class: 'primary', onclick: onSave }, isNew ? 'Add task' : 'Save');
 
+  // Eyebrow + meta match the dashboard's two variants of this header exactly:
+  // /tasks/new shows "Capture" / "Full editor"; /tasks/[id] shows the task's
+  // status (+ source, if not manual) / its created date.
+  const eyebrow = isNew
+    ? 'Capture'
+    : [
+        row.status === 'done' ? 'Done' : row.status === 'waiting' ? 'Waiting' : 'Open',
+        row.source && row.source !== 'manual' ? `via ${row.source}` : null,
+      ].filter(Boolean).join(' · ');
+  const meta = isNew
+    ? 'Full editor'
+    : `Created ${new Date(row.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+
   mount.replaceChildren(
-    screenHead('Task', isNew ? 'New task' : (row?.title || 'Edit task'), {
-      actions: [el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Back', onclick: () => go('#/tasks') }, '‹')],
-    }),
-    !isNew ? statusRow(row, id, mount) : null,
+    el('div', { class: 'lib-crumb' }, el('button', { class: 'linkish', type: 'button', onclick: () => go('#/tasks') }, '← Tasks')),
+    screenHead(eyebrow, isNew ? 'New task' : (row?.title || 'Edit task'), { meta }),
+    el('div', { class: 'hairline', style: 'margin-bottom:16px' }),
+    ...(isNew ? [] : [statusRow(row, id, mount)]),
     panel(
       el('div', { class: 'field' }, el('label', {}, 'Title (required)'), title),
       el('div', { class: 'field' }, el('label', {}, 'Notes'), notes),

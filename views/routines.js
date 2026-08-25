@@ -8,7 +8,7 @@
 import { sb } from '../lib/db.js';
 import {
   el, hint, spinner, pill, chips, toast, fail, confirmDelete,
-  svg, sectionLabel, today, ymd, addDays, humanise,
+  svg, sectionLabel, today, ymd, addDays, humanise, screenHead, panel,
 } from '../lib/ui.js';
 import { go } from '../lib/router.js';
 import { openSheet } from '../app.js';
@@ -487,10 +487,14 @@ function routineForm(row, onSaved) {
 
 function field(label, node) { return el('div', { class: 'field' }, el('label', {}, label), node); }
 
+// A port of /routines/new/page.tsx: the same "← Routines" crumb + ScreenHeader
+// + hairline pattern every other create/edit page uses (task-form.tsx's
+// /tasks/new, notably) — not the Library-only reader style.
 export async function routineNew(mount) {
-  mount.replaceChildren(el('div', { class: 'lib-reader' },
+  mount.replaceChildren(
     el('div', { class: 'lib-crumb' }, el('button', { class: 'linkish', type: 'button', onclick: () => go('#/routines') }, '← Routines')),
-    el('header', { class: 'screen-head', style: 'padding:16px 0 20px' }, el('div', { class: 'eyebrow' }, 'Daily'), el('h1', {}, 'New routine')),
-    routineForm(null),
-  ));
+    screenHead('Routines', 'New routine'),
+    el('div', { class: 'hairline', style: 'margin-bottom:16px' }),
+    panel(routineForm(null)),
+  );
 }
