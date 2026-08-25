@@ -680,6 +680,71 @@
     .work-project-grid { grid-template-columns: repeat(auto-fill, minmax(258px, 1fr)); }
   }
 
+  /* ── Library ─────────────────────────────────────────────────────────── */
+  /* Ported from library-view.tsx: a masonry feed of notes/quotes/journal
+     entries plus a book-cover shelf. Shares .work-layout/.work-body/
+     .facet-rail with Content/People/Companies — only the card shapes below
+     are Library's own. Reader pages (note/quote/journal/book detail) use
+     .lib-reader instead of the operational .detail-* shell, since they're a
+     different job: a centered serif read, not a stat-strip dashboard. */
+
+  .lib-masonry { display: flex; align-items: flex-start; gap: 14px; }
+  .lib-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+
+  .lib-card { border: 1px solid var(--line); border-radius: 5px; background: var(--bg); overflow: hidden; transition: border-color 0.12s; }
+  .lib-card:hover { border-color: var(--line-strong); }
+  .lib-card-image-btn { display: block; width: 100%; padding: 0; border: none; background: none; cursor: pointer; }
+  .lib-card-image { display: block; width: 100%; height: 160px; object-fit: cover; border-bottom: 1px solid var(--line); }
+  .lib-card-body { padding: 15px 16px 13px; }
+  .lib-card-kicker { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .lib-card-kicker-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 9.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-3); }
+  .lib-card-photo-count, .lib-card-date { flex: 0 0 auto; font-family: var(--mono); font-size: 10px; color: var(--ink-4); }
+  .lib-card-link { display: block; width: 100%; padding: 0; border: none; background: none; text-align: left; cursor: pointer; color: inherit; }
+  .lib-card-quote { font-family: var(--serif); font-size: 16px; font-style: italic; line-height: 1.45; color: var(--ink); }
+  .lib-card-book { margin-top: 10px; font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lib-card-title { margin-bottom: 6px; font-family: var(--serif); font-size: 15px; font-weight: 500; line-height: 1.25; color: var(--ink); }
+  .lib-card-text { margin: 0; font-family: var(--sans); font-size: 13px; line-height: 1.5; color: var(--ink-2); white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
+
+  .lib-tagrow { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 12px; }
+  .lib-tag { padding: 4px 8px; border-radius: 999px; border: 1px solid var(--line-strong); background: none; color: var(--ink-2); font-family: var(--mono); font-size: 10px; font-weight: 500; cursor: pointer; }
+  .lib-tag.on { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+  .lib-tag-warn { color: var(--warn); border-color: var(--warn-line); cursor: default; }
+
+  .lib-book-grid { display: grid; gap: 18px 14px; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+  .lib-book-card { display: block; width: 100%; padding: 0; border: none; background: none; text-align: left; cursor: pointer; color: inherit; }
+  .lib-book-cover { display: block; width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 3px; margin-bottom: 8px; border: 1px solid var(--line-strong); }
+  .lib-book-cover-tint { display: flex; align-items: flex-start; padding: 12px; font-family: var(--serif); font-size: 13px; font-weight: 500; line-height: 1.25; }
+  .lib-book-title { font-family: var(--sans); font-size: 12.5px; font-weight: 500; line-height: 1.3; color: var(--ink); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .lib-book-author { margin-top: 3px; font-family: var(--mono); font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lib-book-foot { display: flex; align-items: center; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+  .lib-book-meta { font-family: var(--mono); font-size: 9.5px; color: var(--ink-4); }
+
+  .lib-reader { max-width: 640px; margin: 0 auto; padding: 16px 20px 88px; }
+  .lib-reader.wide { max-width: 760px; }
+  .lib-crumb { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); }
+  .lib-crumb button.linkish { text-decoration: none; }
+  .lib-reader-eyebrow { margin-top: 10px; font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.11em; color: var(--ink-3); }
+  .lib-reader-title { margin: 8px 0 0; font-family: var(--serif); font-size: 27px; font-weight: 500; line-height: 1.1; letter-spacing: -0.02em; color: var(--ink); }
+  .lib-reader-body { margin-top: 24px; font-family: var(--serif); font-size: 18px; line-height: 1.62; color: var(--ink-2); white-space: pre-wrap; }
+  .lib-reader-footer { margin-top: 44px; padding-top: 18px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+
+  .lib-gallery { display: flex; flex-direction: column; gap: 8px; }
+  .lib-gallery-row { display: grid; gap: 8px; }
+  .lib-gallery-tile { display: block; width: 100%; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: var(--surface-2); cursor: pointer; overflow: hidden; }
+  .lib-gallery-tile img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .lib-lightbox { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,0.92); display: flex; flex-direction: column; }
+  .lib-lightbox-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(255,255,255,0.7); }
+  .lib-lightbox-body { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 0 16px 8px; gap: 8px; }
+  .lib-lightbox-body img { max-height: 100%; max-width: 100%; object-fit: contain; }
+  .lib-lightbox-nav { flex: 0 0 auto; background: none; border: none; color: rgba(255,255,255,0.5); font-size: 28px; padding: 32px 12px; cursor: pointer; }
+  .lib-lightbox-nav:hover { color: #fff; }
+
+  .lib-annot { padding-left: 14px; border-left: 2px solid var(--line); margin-bottom: 18px; }
+  .lib-annot.accent { border-left-color: var(--accent); }
+  .lib-annot-meta { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
+  .lib-annot.accent .lib-annot-meta { color: var(--accent); }
+  .lib-annot-body { margin: 5px 0 0; font-family: var(--sans); font-size: 14px; line-height: 1.5; color: var(--ink); white-space: pre-wrap; }
+
   /* ── Forms ───────────────────────────────────────────────────────────── */
 
   label {
@@ -1015,7 +1080,7 @@
 
     /* Components carry a 20px gutter for the phone; the column owns spacing
        here, so that gutter is removed rather than doubled. */
-    .screen-head, .section-label, .controls, .hint, .form-actions { padding-inline: 0; }
+    .screen-head, .section-label, .controls, .hint, .form-actions, .lib-reader { padding-inline: 0; }
     .item { padding-inline: 0; }
     .panel { margin-inline: 0; }
 

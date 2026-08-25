@@ -21,6 +21,10 @@ import { searchView } from './views/search.js';
 import { contentList, contentNew, contentDetail } from './views/content.js';
 import { peopleList, personNew, personDetail } from './views/people.js';
 import { companiesList, companyNew, companyDetail } from './views/companies.js';
+import {
+  libraryView, noteDetail, noteNew, quoteDetail, quoteNew,
+  journalDetail, journalNew, bookDetail, bookNew,
+} from './views/library.js';
 
 // ─── Routes ──────────────────────────────────────────────────────────────
 
@@ -51,6 +55,26 @@ route('/c/people/:id', personDetail);
 route('/c/companies', companiesList);
 route('/c/companies/new', companyNew);
 route('/c/companies/:id', companyDetail);
+
+// Library — a real port (masonry facet feed + book shelf + reader-style
+// detail pages), not the generic descriptor-driven list/form. Registered
+// ahead of '/c/:key' for the same reason as Content/People/Companies above.
+// The underlying '/c/notes', '/c/quotes', '/c/books', '/c/journal' generic
+// routes still work (unlinked, harmless) as a fallback.
+route('/library', libraryView);
+// A type filter as a path segment, not '?type=' — the router matches the
+// whole hash literally and never strips a query string, so '?' breaks route
+// matching entirely (falls through to no route). See views/library.js.
+route('/library/:type', libraryView);
+route('/library/notes/new', noteNew);
+route('/library/notes/:id', noteDetail);
+route('/library/quotes/new', quoteNew);
+route('/library/quotes/new/:bookId', quoteNew);
+route('/library/quotes/:id', quoteDetail);
+route('/library/journal/new', journalNew);
+route('/library/journal/:id', journalDetail);
+route('/library/books/new', bookNew);
+route('/library/books/:id', bookDetail);
 
 // Area index screens behind the Work / People / Library tabs.
 route('/g/:label', groupView);
@@ -121,7 +145,7 @@ const TABS = [
   { href: '#/work', label: 'Work', icon: 'work' },
   { href: '#/c/content', label: 'Content', icon: 'content' },
   { href: '#/c/people', label: 'People', icon: 'people' },
-  { href: '#/g/library', label: 'Library', icon: 'library' },
+  { href: '#/library', label: 'Library', icon: 'library' },
 ];
 
 // Every route that isn't one of the five tabs lives behind More, so More
@@ -129,7 +153,6 @@ const TABS = [
 const MORE_ITEMS = [
   { href: '#/tasks', label: 'Tasks', glyph: '☰' },
   { href: '#/routines', label: 'Routines', glyph: '↻' },
-  { href: '#/c/notes', label: 'Notes', glyph: '✎' },
   { href: '#/c/captured', label: 'Inbox', glyph: '⬚' },
   { href: '#/c/calendar', label: 'Calendar', glyph: '▤' },
   { href: '#/c/companies', label: 'Companies', glyph: '⌂' },
@@ -174,7 +197,7 @@ const RAIL_NAV = [
   { href: '#/c/content', label: 'Content', icon: 'content' },
   { href: '#/c/people', label: 'People', icon: 'people' },
   { href: '#/c/companies', label: 'Companies', icon: 'companies' },
-  { href: '#/g/library', label: 'Library', icon: 'library' },
+  { href: '#/library', label: 'Library', icon: 'library' },
   { href: '#/routines', label: 'Routines', icon: 'routines' },
 ];
 
