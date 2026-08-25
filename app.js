@@ -1,8 +1,9 @@
 // Boot, auth, routing and the app shell.
 
 import { sb, loadRef } from './lib/db.js';
+import { appSettings, loadAppSettings } from './lib/settings.js';
 import {
-  $, el, panel, hint, svg, toast, fail, screenHead,
+  $, el, panel, svg, toast, fail, screenHead,
   currentTheme, setTheme, humanise,
 } from './lib/ui.js';
 import { route, startRouter, go, currentPath } from './lib/router.js';
@@ -11,10 +12,10 @@ import { byKey, GROUPS } from './schema.js';
 import { todayView } from './views/today.js';
 import { workView } from './views/work.js';
 import { tasksList, taskForm } from './views/tasks.js';
-import { routinesList, routineForm } from './views/routines.js';
+import { routinesList, routineDetail, routineNew } from './views/routines.js';
 import { captureView } from './views/capture.js';
 import { groupView } from './views/group.js';
-import { enablePush, pushStatus } from './views/push.js';
+import { settingsView } from './views/settings.js';
 import { attentionView } from './views/attention.js';
 import { notificationsView } from './views/notifications.js';
 import { searchView } from './views/search.js';
@@ -40,7 +41,8 @@ route('/tasks', tasksList);
 route('/tasks/:id', taskForm);
 
 route('/routines', routinesList);
-route('/routines/:id', routineForm);
+route('/routines/new', routineNew);
+route('/routines/:id', routineDetail);
 
 // Content / People / Companies are real ports (facet rail, card grid, detail
 // shell), not the generic descriptor-driven list/form — so they're routed
@@ -397,9 +399,12 @@ export function closeSheet() {
 }
 
 function openMoreSheet() {
+  // Health has no built screens behind its stub route when the module is
+  // off — hide the entry rather than link to a dead destination.
+  const items = MORE_ITEMS.filter((it) => it.href !== '#/g/health' || appSettings.health_module_enabled);
   openSheet(el('div', {},
     el('div', { class: 'sheet-head' }, el('div', { class: 'eyebrow' }, 'More')),
-    el('div', {}, ...MORE_ITEMS.map((it) =>
+    el('div', {}, ...items.map((it) =>
       el('button', {
         class: 'sheet-item', type: 'button',
         onclick: () => { closeSheet(); go(it.href); },
@@ -426,37 +431,6 @@ function openMoreSheet() {
 window.addEventListener('hashchange', () => {
   if (!$('sheet').classList.contains('hidden')) closeSheet();
 });
-
-// ─── Settings ────────────────────────────────────────────────────────────
-
-async function settingsView(mount) {
-  const themeBtn = el('button', { class: 'ghost', onclick: toggleTheme },
-    currentTheme() === 'dark' ? 'Switch to light' : 'Switch to dark');
-
-  function toggleTheme() {
-    const next = currentTheme() === 'dark' ? 'light' : 'dark';
-    setTheme(next);
-    themeBtn.textContent = next === 'dark' ? 'Switch to light' : 'Switch to dark';
-  }
-
-  const status = hint('');
-  const pushBtn = el('button', { class: 'ghost', onclick: async () => {
-    await enablePush();
-    status.textContent = await pushStatus();
-  } }, 'Enable notifications');
-
-  pushStatus().then((s) => { status.textContent = s; });
-
-  mount.replaceChildren(
-    screenHead('Setup', 'Settings'),
-    el('div', { class: 'section-label' }, el('div', { class: 'eyebrow' }, 'Appearance')),
-    el('div', { class: 'form-actions' }, themeBtn),
-    el('div', { class: 'section-label' }, el('div', { class: 'eyebrow' }, 'Notifications')),
-    el('div', { class: 'form-actions' }, pushBtn),
-    status,
-    hint('Reminders only fire for tasks that have a due time and at least one reminder set.'),
-  );
-}
 
 // ─── Auth ────────────────────────────────────────────────────────────────
 
@@ -543,6 +517,8 @@ async function boot() {
   } catch (err) {
     fail(err);
   }
+  // Feeds the Health nav-visibility check in openMoreSheet() below.
+  await loadAppSettings().catch(() => {});
   await loadBadgeCounts().catch(() => {});
 
   buildNav();
