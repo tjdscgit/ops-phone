@@ -18,6 +18,9 @@ import { enablePush, pushStatus } from './views/push.js';
 import { attentionView } from './views/attention.js';
 import { notificationsView } from './views/notifications.js';
 import { searchView } from './views/search.js';
+import { contentList, contentNew, contentDetail } from './views/content.js';
+import { peopleList, personNew, personDetail } from './views/people.js';
+import { companiesList, companyNew, companyDetail } from './views/companies.js';
 
 // ─── Routes ──────────────────────────────────────────────────────────────
 
@@ -34,6 +37,20 @@ route('/tasks/:id', taskForm);
 
 route('/routines', routinesList);
 route('/routines/:id', routineForm);
+
+// Content / People / Companies are real ports (facet rail, card grid, detail
+// shell), not the generic descriptor-driven list/form — so they're routed
+// explicitly here, ahead of the '/c/:key' catch-all below which would
+// otherwise match these same paths first-come.
+route('/c/content', contentList);
+route('/c/content/new', contentNew);
+route('/c/content/:id', contentDetail);
+route('/c/people', peopleList);
+route('/c/people/new', personNew);
+route('/c/people/:id', personDetail);
+route('/c/companies', companiesList);
+route('/c/companies/new', companyNew);
+route('/c/companies/:id', companyDetail);
 
 // Area index screens behind the Work / People / Library tabs.
 route('/g/:label', groupView);
@@ -103,7 +120,7 @@ const TABS = [
   { href: '#/today', label: 'Today', icon: 'today' },
   { href: '#/work', label: 'Work', icon: 'work' },
   { href: '#/c/content', label: 'Content', icon: 'content' },
-  { href: '#/g/people', label: 'People', icon: 'people' },
+  { href: '#/c/people', label: 'People', icon: 'people' },
   { href: '#/g/library', label: 'Library', icon: 'library' },
 ];
 
