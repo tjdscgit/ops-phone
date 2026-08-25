@@ -26,6 +26,8 @@ import {
   libraryView, noteDetail, noteNew, quoteDetail, quoteNew,
   journalDetail, journalNew, bookDetail, bookNew,
 } from './views/library.js';
+import { projectDetail, projectNew } from './views/projects.js';
+import { domainDetail } from './views/domains.js';
 
 // ─── Routes ──────────────────────────────────────────────────────────────
 
@@ -77,6 +79,16 @@ route('/library/journal/new', journalNew);
 route('/library/journal/:id', journalDetail);
 route('/library/books/new', bookNew);
 route('/library/books/:id', bookDetail);
+
+// Project and Domain detail are real ports too (checklist/milestones/
+// contacts/activity/conversations for projects; cadence editor + task
+// grouping for domains) — found missing when Taylor asked whether every
+// sub-page was actually done. Every "open project"/"open folder" link
+// across Work/People/Companies/Library already points at these paths; they
+// used to fall through to the generic '/c/:key/:id' form below.
+route('/c/projects/new', projectNew);
+route('/c/projects/:id', projectDetail);
+route('/c/domains/:id', domainDetail);
 
 // Area index screens behind the Work / People / Library tabs.
 route('/g/:label', groupView);
