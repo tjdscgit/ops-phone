@@ -870,6 +870,11 @@
     display: grid; place-items: center; font-size: 18px; line-height: 1;
     font-family: var(--sans);
   }
+  /* Spins the glyph, not the button box, while a manual sync is in flight
+     (the Planner sync-now button in the Tasks header) -- tasks.js toggles
+     this class rather than reaching for a spinner component for one icon. */
+  .icon-btn.spin { animation: icon-spin 0.8s linear infinite; }
+  @keyframes icon-spin { to { transform: rotate(360deg); } }
 
   .row { display: flex; gap: 8px; }
   .row > * { flex: 1; }
@@ -1417,6 +1422,13 @@
   }
   .cal-unsched-btn:hover { border-color: var(--ink-3); color: var(--ink); }
 
+  .cal-gear-btn {
+    width: 32px; height: 32px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--line-strong); background: none; color: var(--ink-2);
+    font-size: 14px; line-height: 1;
+  }
+  .cal-gear-btn:hover { border-color: var(--ink-3); color: var(--ink); }
+
   /* ── Time grid ───────────────────────────────────────────────────────── */
   /* One gutter column plus --cal-days equal day columns, declared once here
      so the header row, the all-day strip and the body can never drift out of
@@ -1464,6 +1476,7 @@
   }
 
   .cal-now { position: absolute; left: 0; right: 0; height: 0; border-top: 1.5px solid var(--accent); z-index: 40; pointer-events: none; }
+  .cal-now.hidden { display: none; }
   .cal-now-dot { position: absolute; left: -4px; top: -4px; width: 8px; height: 8px; border-radius: 999px; background: var(--accent); }
 
   /* Sweep-to-create band. */

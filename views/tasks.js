@@ -446,6 +446,43 @@ export async function tasksList(mount) {
     renderDetail();
   }
 
+  // Asks the sync-planner workflow to run right now instead of waiting out
+  // the 15-minute cron. Calls the planner-sync-trigger Edge Function, which
+  // dispatches the GitHub Actions workflow and waits (up to its own budget)
+  // for the run to finish before replying — supabase-js attaches this
+  // client's session automatically, so the function's Ops auth path (a real
+  // Supabase JWT) is satisfied with no extra wiring here.
+  let syncing = false;
+  function syncBtn() {
+    const btn = el('button', {
+      class: 'icon-btn', type: 'button', title: 'Sync Planner now',
+      'aria-label': 'Sync Planner now',
+      onclick: async () => {
+        if (syncing) return;
+        syncing = true;
+        btn.disabled = true;
+        btn.classList.add('spin');
+        try {
+          const { data, error } = await sb.functions.invoke('planner-sync-trigger', { method: 'POST' });
+          if (error) { toast('Sync failed to start', 'err'); return; }
+          if (data?.conclusion === 'failure') { toast('Planner sync failed — check GitHub Actions', 'err'); return; }
+          if (data?.status === 'completed') { toast('Synced with the Planner'); await rerenderRoute(); return; }
+          // Dispatched but not confirmed finished within the function's own
+          // wait budget — it is still running, not stuck; the next cron tick
+          // (or another tap of this button) will pick up whatever it missed.
+          toast('Sync started — check back shortly');
+        } catch {
+          toast('Could not reach the sync function', 'err');
+        } finally {
+          syncing = false;
+          btn.disabled = false;
+          btn.classList.remove('spin');
+        }
+      },
+    }, '↻');
+    return btn;
+  }
+
   const rowCtx = {
     selectedId: () => selectedTaskId,
     onSelect: (id) => { if (isDesktop()) selectTask(id); else go(`#/tasks/${id}`); },
@@ -646,6 +683,7 @@ export async function tasksList(mount) {
           el('h1', {}, 'Tasks'),
         ),
         el('div', { style: 'display:flex; align-items:center; gap:8px' },
+          syncBtn(),
           filterWrap,
           el('button', { class: 'work-cta', type: 'button', onclick: () => openNewTaskSheet() }, '+ Add task'),
         ),
