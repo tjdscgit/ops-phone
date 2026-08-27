@@ -10,13 +10,13 @@
 // component the Tasks list and Today use.
 
 import { sb, ref, refName } from '../lib/db.js';
-import { el, hint, spinner, pill, toast, fail, confirmDelete, niceDate, today } from '../lib/ui.js';
+import { el, hint, spinner, pill, toast, fail, confirmDelete, niceDate, today, localDateOf } from '../lib/ui.js';
 import { go } from '../lib/router.js';
 import {
   detailHeader, crumbDot, actionButton, statStrip, stat, workCounts,
   detailBody, detailSection, railBlock, kv, editDrawer,
 } from '../lib/detail-shell.js';
-import { taskRow } from './tasks.js';
+import { taskRow, openNewTaskSheet } from './tasks.js';
 import { conversationTimeline, logConversationForm } from '../lib/conversations.js';
 import {
   PROJECT_COLOR_PALETTE, retainerCycle, buildMilestoneGroups, buildDueGroups,
@@ -61,7 +61,7 @@ export async function projectDetail(mount, { id }) {
   const openTasks = tasks.filter((x) => x.status === 'open');
   const waitingTasks = tasks.filter((x) => x.status === 'waiting');
   const doneTasks = tasks.filter((x) => x.status === 'done').sort((a, b) => (b.completed_at ?? '').localeCompare(a.completed_at ?? ''));
-  const doneToday = doneTasks.filter((x) => (x.completed_at ?? '').slice(0, 10) === t);
+  const doneToday = doneTasks.filter((x) => localDateOf(x.completed_at) === t);
 
   const overdueCount = openTasks.filter((x) => x.due_date && x.due_date < t).length;
   const dueTodayCount = openTasks.filter((x) => x.due_date === t).length;
@@ -132,7 +132,7 @@ export async function projectDetail(mount, { id }) {
     color: project.color,
     state: pill(stateChip.s, stateChip.label),
     actions: [
-      actionButton({ onClick: () => go(`#/tasks/new`) }, '+ Task'),
+      actionButton({ onClick: () => openNewTaskSheet() }, '+ Task'),
       actionButton({ onClick: () => document.getElementById('log-work')?.scrollIntoView({ behavior: 'smooth' }) }, '+ Log work'),
       actionButton({ onClick: () => document.getElementById('conversations')?.scrollIntoView({ behavior: 'smooth' }) }, '+ Conversation'),
       editDrawer(`Edit ${isArea ? 'area' : 'project'}`, projectForm(project, refresh)),
@@ -159,7 +159,7 @@ export async function projectDetail(mount, { id }) {
   paintConversations(convSlot, project.id, conversations, refresh);
 
   const main = [
-    detailSection({ label: 'Tasks', count: `${openTasks.length} open${overdueCount ? ` · ${overdueCount} overdue` : ''}${waitingTasks.length ? ` · ${waitingTasks.length} waiting` : ''}`, action: el('button', { class: 'linkish', type: 'button', style: 'text-decoration:none', onclick: () => go('#/tasks/new') }, '+ Add task') }, taskSection),
+    detailSection({ label: 'Tasks', count: `${openTasks.length} open${overdueCount ? ` · ${overdueCount} overdue` : ''}${waitingTasks.length ? ` · ${waitingTasks.length} waiting` : ''}`, action: el('button', { class: 'linkish', type: 'button', style: 'text-decoration:none', onclick: () => openNewTaskSheet() }, '+ Add task') }, taskSection),
     el('section', { id: 'log-work', style: 'margin-top:30px' }, detailSection({ label: 'Activity', count: activity.length || undefined }, activitySlot)),
     el('section', { id: 'conversations', style: 'margin-top:30px' }, detailSection({ label: 'Conversations', count: conversations.length || undefined }, convSlot)),
     doneTasks.length > 0 ? el('details', { style: 'margin-top:30px' },

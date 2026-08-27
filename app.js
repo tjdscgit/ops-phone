@@ -349,6 +349,11 @@ function updateTopbar(path) {
 function markActive(path) {
   updateTopbar(path);
 
+  // The desktop 3-pane Tasks workspace wants more room than the usual capped
+  // 1120px reading column every other screen uses — exact match only, so
+  // /tasks/:id (still the full-page editor) keeps the normal layout.
+  $('main')?.classList.toggle('tasks-shell', path === '/tasks');
+
   const matches = (href) => {
     const base = href.slice(1);
     return path === base || path.startsWith(base + '/');
@@ -376,16 +381,27 @@ function markActive(path) {
 }
 
 // ─── Bottom sheet ────────────────────────────────────────────────────────
-// One #sheet/#sheetScrim pair, reused by the More menu and by any screen's
+// One #sheet/#sheetScrim pair, reused by the More menu, by any screen's
 // mobile Filters (the phone counterpart of the dashboard's FacetRail, which
-// renders the same facet groups in a desktop sidebar and a mobile sheet).
+// renders the same facet groups in a desktop sidebar and a mobile sheet),
+// and by content dialogs (add-task, editDrawer). The nav uses (More, mobile
+// Filters) have a desktop equivalent already on screen, so a `@media
+// (min-width: 800px)` rule force-hides the plain sheet there — content
+// dialogs don't have a desktop equivalent, so they pass `dialog: true` to
+// stay visible past that breakpoint too (see the `.sheet.dialog` CSS
+// exemption in index.html).
 // Exported so a view (e.g. Work) can open it with its own content.
 
-export function openSheet(content) {
+export function openSheet(content, { dialog = false, compact = false } = {}) {
   const sheet = $('sheet');
   const scrim = $('sheetScrim');
 
   sheet.replaceChildren(el('div', { class: 'sheet-grip' }), content);
+  sheet.classList.toggle('dialog', dialog);
+  scrim.classList.toggle('dialog', dialog);
+  // `.sheet.dialog` is a fixed ~560px box — fine for a form, too wide for a
+  // small popover like the task detail pane's clock-dial time picker.
+  sheet.classList.toggle('compact', compact);
 
   scrim.classList.remove('hidden');
   sheet.classList.remove('hidden');

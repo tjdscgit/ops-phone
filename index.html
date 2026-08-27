@@ -958,6 +958,39 @@
     color: var(--ink-3); font-size: 15px;
   }
 
+  /* ── Context menu ────────────────────────────────────────────────────── */
+  /* Right-click on a task row: date/priority quick-set rows (reusing .chip)
+     over a plain action list — a trimmed port of TickTick's menu, kept to
+     what this schema actually has (no subtasks/tags/focus/notes-conversion). */
+  .ctx-scrim { position: fixed; inset: 0; z-index: 55; background: none; border: none; padding: 0; cursor: default; }
+  .ctx-menu {
+    position: fixed; z-index: 56; min-width: 240px; max-width: 300px;
+    background: var(--surface-2); border: 1px solid var(--line-strong); border-radius: 8px;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4); padding: 8px 0;
+    opacity: 0; transform: scale(0.97); transform-origin: top left;
+    transition: opacity 0.1s, transform 0.1s;
+  }
+  .ctx-menu.show { opacity: 1; transform: none; }
+  .ctx-label {
+    padding: 8px 14px 4px; font-family: var(--mono); font-size: 9.5px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.09em; color: var(--ink-3);
+  }
+  .ctx-row { padding: 0 14px 10px; }
+  /* Wraps onto a second line instead of the horizontal scroll `.chips` (from
+     lib/ui.js) normally does — right for a mobile filter strip, wrong for a
+     fixed-width popover, where it just ran "None" off the edge. */
+  .ctx-chip-wrap { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ctx-chip-wrap .chip { min-height: 30px; padding: 0 10px; font-size: 10.5px; }
+  .ctx-date-input { width: 100%; padding: 0 8px; min-height: 30px; font-size: 12px; }
+  .ctx-sep { height: 1px; margin: 6px 0; background: var(--line); }
+  .ctx-item {
+    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+    padding: 9px 14px; border: none; background: none; color: var(--ink);
+    font-family: var(--sans); font-size: 13.5px; cursor: pointer;
+  }
+  .ctx-item:hover { background: var(--hover-wash); }
+  .ctx-item.danger { color: var(--accent); }
+
   /* ── Toast ───────────────────────────────────────────────────────────── */
   .toast {
     position: fixed; left: 16px; right: 16px;
@@ -981,7 +1014,7 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .toast, .sheet, .sheet-scrim, .item { transition: none; }
+    .toast, .sheet, .sheet-scrim, .item, .ctx-menu { transition: none; }
   }
 
   /* ═══════════════════════════════════════════════════════════════════════
@@ -993,7 +1026,13 @@
   @media (min-width: 800px) {
     :root { --rail: 64px; --rail-open: 236px; --rail-slot: var(--rail); }
 
-    body { padding: 0 0 0 var(--rail-slot); }
+    body { padding: 0 0 0 var(--rail-slot); transition: padding-left 0.2s ease-out; }
+    /* Hover/focus push the content column over too, same as pinning —
+       :has() reaches from the rail (a body child, not an ancestor) up to
+       body without JS. Higher specificity than the --rail-slot rule above
+       wins regardless of source order, so pin still works once JS restores
+       it on load. */
+    body:has(.rail:hover), body:has(.rail:focus-within) { padding-left: var(--rail-open); }
 
     /* ── Topbar ──────────────────────────────────────────────────────── */
     .topbar {
@@ -1040,11 +1079,11 @@
       background: var(--surface); border-right: 1px solid var(--line);
       transition: width 0.2s ease-out;
     }
-    /* Expands on hover to reveal labels, then collapses again — the content
-       column keeps the collapsed width, so nothing reflows underneath.
-       Pinning (the footer's pin button, or `[`) widens the SLOT itself
-       (--rail-slot, set on body's padding-left) so the rail pushes layout
-       instead of overlaying it, and stays open without a hover. */
+    /* Expands on hover to reveal labels, pushing the content column over
+       (see the body:has() rule above) — collapses, and pushes back, the
+       moment the pointer/focus leaves. Pinning (the footer's pin button, or
+       `[`) widens the SLOT itself (--rail-slot, set on body's padding-left)
+       so it stays open the same way without a hover held. */
     .rail:hover, .rail:focus-within, .rail.pinned { width: var(--rail-open); }
 
     .rail-head {
@@ -1127,6 +1166,9 @@
       max-width: 1120px; margin: 0 auto; width: 100%;
       padding: 0 40px 48px;
     }
+    /* Tasks' 3-pane workspace wants the full remaining width, not a capped
+       reading column — see markActive() in app.js for the toggle. */
+    main.tasks-shell { max-width: none; padding: 0; }
 
     /* Components carry a 20px gutter for the phone; the column owns spacing
        here, so that gutter is removed rather than doubled. */
@@ -1157,8 +1199,152 @@
     .brief-metric { flex-basis: 92px; }
     .brief-metric .big { font-size: 42px; }
 
-    /* The More sheet is a phone affordance; the rail lists everything. */
-    .sheet, .sheet-scrim { display: none !important; }
+    /* The More sheet and mobile Filters are phone affordances; the rail and
+       facet sidebar list everything on desktop. Content dialogs (add-task,
+       editDrawer) reuse the same #sheet element but have no desktop
+       equivalent, so they carry a `.dialog` class (see openSheet) that's
+       exempted from this hide. */
+    .sheet:not(.dialog), .sheet-scrim:not(.dialog) { display: none !important; }
+
+    /* A full-width bottom sheet reads as an oversized drawer with acres of
+       empty space beside it once the viewport is this wide — the content
+       dialog wants to be a centred modal instead, sized to its form. */
+    .sheet.dialog {
+      left: 50%; right: auto; bottom: auto; top: 50%;
+      width: min(560px, 90vw); max-height: 80vh;
+      border-radius: 12px; border: 1px solid var(--line);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+      transform: translate(-50%, -46%); opacity: 0;
+      transition: transform 0.18s ease, opacity 0.18s ease;
+    }
+    .sheet.dialog.show { transform: translate(-50%, -50%); opacity: 1; }
+    .sheet.dialog .sheet-grip { display: none; }
+    .sheet.dialog.compact { width: 320px; }
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     Tasks — desktop 3-pane workspace.
+     Nav rail (app.js, unrelated to this block) | this list pane, with a
+     filter dropdown replacing the old permanent facet-rail sidebar | a
+     detail pane for the selected task. Phone width is untouched: the list
+     alone fills the screen and a tap still opens /tasks/:id, so the pieces
+     below that only matter there (.work-row, the filter dropdown) are base
+     rules, while the pane split itself is desktop-only.
+     ═══════════════════════════════════════════════════════════════════════ */
+
+  .tasks-detail-pane { display: none; }
+
+  /* Row layout — .work-row/.work-row-main were previously unstyled
+     (falling back to default inline-block flow); now real flex rows so the
+     selection state below has something reliable to key off. */
+  .tasks-list-pane .work-row {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 9px 0; margin: 0 -4px; padding-inline: 4px;
+    border-left: 2px solid transparent; border-radius: 4px; cursor: pointer;
+    transition: background 0.1s, border-color 0.1s;
+  }
+  @media (hover: hover) { .tasks-list-pane .work-row:hover { background: var(--hover-wash); } }
+  .tasks-list-pane .work-row.selected { background: var(--active-wash); border-left-color: var(--accent); }
+  .tasks-list-pane .work-row-main { flex: 1; min-width: 0; }
+
+  /* Filter dropdown — replaces the desktop facet-rail; hidden on phone,
+     which keeps its existing .filters-fab + bottom-sheet untouched. */
+  .tasks-filter-wrap { position: relative; }
+  .tasks-filter-trigger {
+    display: none; align-items: center; gap: 7px; height: 32px; padding: 0 10px 0 12px;
+    border-radius: 5px; border: 1px solid var(--line-strong); background: none;
+    color: var(--ink-2); cursor: pointer;
+    font-family: var(--sans); font-size: 12.5px; font-weight: 500;
+  }
+  .tasks-filter-trigger:hover, .tasks-filter-trigger.open { border-color: var(--ink-3); color: var(--ink); }
+  .tasks-filter-trigger .chev { font-size: 10px; transition: transform 0.12s; }
+  .tasks-filter-trigger.open .chev { transform: rotate(180deg); }
+  .tasks-filter-scrim { position: fixed; inset: 0; z-index: 25; background: none; border: none; padding: 0; cursor: default; }
+  .tasks-filter-panel {
+    position: absolute; top: calc(100% + 8px); left: 0; z-index: 30; width: 270px;
+    background: var(--surface-2); border: 1px solid var(--line-strong); border-radius: 7px;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4); padding: 14px 0; max-height: 480px; overflow-y: auto;
+  }
+
+  /* Detail pane — read view is a 2-column property grid; edit mode swaps
+     each value for a control in the exact same slot (no boxed chrome at
+     rest for title/notes/date — just an accent underline on focus — so
+     nothing else on the page shifts when Edit is toggled). */
+  .tasks-detail-inner { padding: 0; }
+  .detail-status-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .detail-status-actions { margin-left: auto; display: flex; gap: 8px; }
+  .task-detail-title { margin-top: 22px; font-family: var(--serif); font-size: 24px; font-weight: 500; letter-spacing: -0.01em; line-height: 1.25; color: var(--ink); }
+  .task-detail-notes { margin-top: 10px; font-family: var(--sans); font-size: 14px; line-height: 1.6; color: var(--ink-2); white-space: pre-line; }
+  .task-detail-title-input, .task-detail-notes-input, .task-kv-input {
+    display: block; width: 100%;
+    background: none; border: none; border-bottom: 1px solid transparent; border-radius: 0; padding: 0 0 2px; outline: none;
+    font-family: var(--sans); font-size: 14px; color: var(--ink);
+    transition: border-color 0.12s;
+  }
+  .task-detail-title-input:focus, .task-detail-notes-input:focus, .task-kv-input:focus { border-bottom-color: var(--accent); }
+  .task-detail-title-input { margin-top: 22px; font-family: var(--serif); font-size: 24px; font-weight: 500; letter-spacing: -0.01em; }
+  .task-detail-notes-input { margin-top: 10px; resize: vertical; min-height: 60px; color: var(--ink-2); }
+  .task-kv-grid { margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--line); display: grid; grid-template-columns: 1fr 1fr; gap: 18px 28px; }
+  .task-kv-item { min-width: 0; }
+  .task-kv-key { display: block; font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); margin-bottom: 5px; }
+  .task-kv-val { display: block; font-family: var(--sans); font-size: 14px; color: var(--ink); }
+  .task-kv-item select { min-height: 34px; padding: 6px 8px; font-size: 13px; }
+  .task-kv-item input[type="date"] { min-height: 0; padding: 0 0 2px; }
+  .task-kv-clock-trigger {
+    display: flex; align-items: center; gap: 6px; width: 100%; text-align: left;
+    background: none; border: none; border-bottom: 1px solid transparent; border-radius: 0; padding: 0 0 2px; outline: none; cursor: pointer;
+    font-family: var(--sans); font-size: 14px; color: var(--ink);
+    transition: border-color 0.12s;
+  }
+  .task-kv-clock-trigger:hover, .task-kv-clock-trigger:focus { border-bottom-color: var(--accent); }
+  .task-kv-clock-trigger .glyph { font-size: 13px; flex: 0 0 auto; }
+  .delete-link { display: block; margin-top: 28px; background: none; border: none; padding: 0; cursor: pointer; font-family: var(--mono); font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
+  .delete-link:hover { color: var(--accent); }
+  .tasks-detail-empty { text-align: center; }
+  .tasks-detail-empty .t { font-family: var(--serif); font-size: 20px; font-weight: 500; color: var(--ink); }
+  .tasks-detail-empty .s { margin-top: 6px; font-family: var(--sans); font-size: 13px; color: var(--ink-3); }
+
+  /* Clock-dial time picker — opened via the shared sheet (compact + dialog
+     variants), not a native <input type="time">, since that native picker
+     is entirely OS/browser-owned and can't be restyled. */
+  .time-picker-panel { padding: 20px; }
+  .time-picker-readout { display: flex; align-items: center; justify-content: center; gap: 2px; margin-bottom: 16px; }
+  .tp-seg { background: none; border: none; border-radius: 6px; padding: 4px 8px; cursor: pointer; font-family: var(--serif); font-size: 32px; font-weight: 500; color: var(--ink-3); }
+  .tp-seg.active { color: var(--accent); background: var(--accent-soft); }
+  .tp-colon { font-family: var(--serif); font-size: 32px; font-weight: 500; color: var(--ink-3); }
+  .tp-ampm { display: flex; flex-direction: column; gap: 3px; margin-left: 10px; }
+  .tp-ampm button { background: none; border: 1px solid var(--line-strong); border-radius: 4px; padding: 3px 9px; cursor: pointer; font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: 0.04em; color: var(--ink-3); }
+  .tp-ampm button.active { color: var(--bg); background: var(--accent); border-color: var(--accent); }
+  .clock-dial { position: relative; width: 220px; height: 220px; margin: 0 auto; }
+  .clock-svg { position: absolute; inset: 0; }
+  .dial-num {
+    position: absolute; width: 36px; height: 36px; margin: -18px 0 0 -18px;
+    border-radius: 999px; border: none; background: none; cursor: pointer;
+    display: grid; place-items: center;
+    font-family: var(--sans); font-size: 13px; color: var(--ink-2);
+    transition: background 0.1s, color 0.1s;
+  }
+  .dial-num:hover { background: var(--hover-wash); }
+  .dial-num.active { color: var(--bg); background: var(--accent); font-weight: 600; }
+  .dial-num.active:hover { background: var(--accent); }
+  .time-picker-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+
+  @media (min-width: 800px) {
+    main.tasks-shell .tasks-workspace { display: flex; height: calc(100dvh - 60px); }
+    main.tasks-shell .tasks-list-pane {
+      flex: 0 0 420px; width: 420px; border-right: 1px solid var(--line);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    main.tasks-shell .tasks-list-pane .screen-head { padding: 24px 20px 16px; padding-inline: 20px; }
+    main.tasks-shell .tasks-list-pane .screen-head h1 { font-size: 26px; }
+    main.tasks-shell .tasks-list-scroll { flex: 1; overflow-y: auto; padding: 0 20px 24px; }
+    main.tasks-shell .filters-fab { display: none; }
+
+    main.tasks-shell .tasks-detail-pane { display: block; flex: 1; min-width: 0; overflow-y: auto; }
+    main.tasks-shell .tasks-detail-inner { max-width: 640px; padding: 32px 40px 60px; }
+    main.tasks-shell .tasks-detail-empty { display: flex; align-items: center; justify-content: center; height: 100%; padding: 0 40px; }
+
+    .tasks-filter-trigger { display: inline-flex; }
   }
 </style>
 </head>

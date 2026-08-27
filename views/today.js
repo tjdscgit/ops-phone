@@ -13,7 +13,7 @@ import {
 } from '../lib/ui.js';
 import { go } from '../lib/router.js';
 import { loadBriefing, skipResurfaceItem, resetResurfaceSkip } from '../lib/briefing.js';
-import { taskRow } from './tasks.js';
+import { taskRow, openNewTaskSheet } from './tasks.js';
 
 export async function todayView(mount) {
   mount.replaceChildren(spinner());
@@ -429,12 +429,12 @@ function captureChips() {
     { label: 'Journal', href: '#/c/journal/new' },
     { label: 'Quote', href: '#/c/quotes/new' },
     { label: 'Note', href: '#/c/notes/new' },
-    { label: 'Task', href: '#/tasks/new' },
+    { label: 'Task', onClick: () => openNewTaskSheet() },
   ];
   return el('section', { class: 'briefing-capture' },
     el('div', { class: 'eyebrow', style: 'margin-bottom:8px' }, 'Capture'),
     el('div', { style: 'display:flex; align-items:center; gap:8px; flex-wrap:wrap' },
-      ...chips.map((c) => el('button', { class: 'capture-chip', type: 'button', onclick: () => go(c.href) }, c.label)),
+      ...chips.map((c) => el('button', { class: 'capture-chip', type: 'button', onclick: c.onClick || (() => go(c.href)) }, c.label)),
       el('span', { class: 'eyebrow', style: 'margin-left:4px' }, '— or hold the mic.'),
     ),
   );

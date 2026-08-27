@@ -5,6 +5,7 @@ import { sb, ref, refName } from '../lib/db.js';
 import { el, hint, spinner, pill, toast, fail, humanise, confirmDelete, today } from '../lib/ui.js';
 import { go } from '../lib/router.js';
 import { openSheet } from '../app.js';
+import { openNewTaskSheet } from './tasks.js';
 import { domainColor } from '../lib/domain-colors.js';
 import { youtubeThumbnailUrl, youtubeEmbedUrl } from '../lib/youtube.js';
 import {
@@ -388,7 +389,7 @@ export async function contentDetail(mount, { id }) {
     ].filter(Boolean),
     name: item.title,
     state: pill(urg, chipLabel),
-    actions: [primary, actionButton({ onClick: () => go(`#/tasks/new`) }, '+ Task'), editDrawer('Edit content', contentForm(item))].filter(Boolean),
+    actions: [primary, actionButton({ onClick: () => openNewTaskSheet() }, '+ Task'), editDrawer('Edit content', contentForm(item))].filter(Boolean),
     below: pipeline(item.status, holder, daysInStatus),
   });
 
