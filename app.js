@@ -28,6 +28,7 @@ import {
 } from './views/library.js';
 import { projectDetail, projectNew } from './views/projects.js';
 import { domainDetail } from './views/domains.js';
+import { calendarView } from './views/calendar.js';
 
 // ─── Routes ──────────────────────────────────────────────────────────────
 
@@ -38,6 +39,14 @@ route('/settings', settingsView);
 route('/attention', attentionView);
 route('/notifications', notificationsView);
 route('/search', searchView);
+
+// Calendar. The view and the anchor date live in the path rather than in
+// module state so Back walks the weeks actually looked at, and a link to a
+// particular day survives a reload. Bare '/calendar' falls back to the last
+// view used (localStorage) on today.
+route('/calendar', calendarView);
+route('/calendar/:view', calendarView);
+route('/calendar/:view/:date', calendarView);
 
 route('/tasks', tasksList);
 route('/tasks/:id', taskForm);
@@ -140,6 +149,7 @@ const ICONS = {
   today: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   work: '<rect x="3" y="5" width="13" height="3" rx=".5"/><rect x="7" y="10.5" width="14" height="3" rx=".5"/><rect x="5" y="16" width="11" height="3" rx=".5"/>',
   tasks: '<rect x="3.5" y="4.5" width="6" height="6" rx=".5"/><path d="M5.2 7.4l1.3 1.3 2.3-2.6"/><rect x="3.5" y="13.5" width="6" height="6" rx=".5"/><path d="M13 7.5h7.5M13 16.5h7.5"/>',
+  calendar: '<rect x="3.5" y="5" width="17" height="15" rx=".5"/><path d="M3.5 9.5h17M8 3.5v3M16 3.5v3"/>',
   content: '<rect x="3.5" y="4" width="5" height="16" rx=".5"/><rect x="9.5" y="4" width="5" height="11" rx=".5"/><rect x="15.5" y="4" width="5" height="14" rx=".5"/>',
   people: '<circle cx="12" cy="8" r="3.5"/><path d="M5 20c1.5-4 4.5-6 7-6s5.5 2 7 6"/>',
   companies: '<rect x="3.5" y="4" width="7.5" height="16" rx=".5"/><rect x="13.5" y="9.5" width="7" height="10.5" rx=".5"/><path d="M6.2 8h2.2M6.2 12h2.2M16.2 13.5h1.8"/>',
@@ -168,7 +178,7 @@ const MORE_ITEMS = [
   { href: '#/tasks', label: 'Tasks', glyph: '☰' },
   { href: '#/routines', label: 'Routines', glyph: '↻' },
   { href: '#/c/captured', label: 'Inbox', glyph: '⬚' },
-  { href: '#/c/calendar', label: 'Calendar', glyph: '▤' },
+  { href: '#/calendar', label: 'Calendar', glyph: '▤' },
   { href: '#/c/companies', label: 'Companies', glyph: '⌂' },
   { href: '#/c/observations', label: 'Observations', glyph: '◎' },
   { href: '#/g/health', label: 'Health', glyph: '♡' },
@@ -208,6 +218,7 @@ const RAIL_NAV = [
   { href: '#/today', label: 'Today', icon: 'today' },
   { href: '#/work', label: 'Work', icon: 'work' },
   { href: '#/tasks', label: 'Tasks', icon: 'tasks' },
+  { href: '#/calendar', label: 'Calendar', icon: 'calendar' },
   { href: '#/c/content', label: 'Content', icon: 'content' },
   { href: '#/c/people', label: 'People', icon: 'people' },
   { href: '#/c/companies', label: 'Companies', icon: 'companies' },
@@ -316,6 +327,7 @@ const CRUMBS = {
   today: { label: 'Today', sub: 'Briefing' },
   work: { label: 'Work', sub: 'Manager’s map' },
   tasks: { label: 'Tasks', sub: 'Everything open' },
+  calendar: { label: 'Calendar', sub: 'Day / week / month' },
   c: { label: 'Browse' }, // overwritten below once the :key segment is known
   routines: { label: 'Routines', sub: 'Daily habits' },
   attention: { label: 'Attention' },
@@ -353,6 +365,8 @@ function markActive(path) {
   // 1120px reading column every other screen uses — exact match only, so
   // /tasks/:id (still the full-page editor) keeps the normal layout.
   $('main')?.classList.toggle('tasks-shell', path === '/tasks');
+  // The calendar wants the full width too, on every one of its routes.
+  $('main')?.classList.toggle('cal-shell', path.startsWith('/calendar'));
 
   const matches = (href) => {
     const base = href.slice(1);

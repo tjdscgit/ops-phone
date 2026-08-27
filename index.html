@@ -1247,6 +1247,15 @@
   .tasks-list-pane .work-row.selected { background: var(--active-wash); border-left-color: var(--accent); }
   .tasks-list-pane .work-row-main { flex: 1; min-width: 0; }
 
+  /* ── Drag a task between group sections ─────────────────────────────── */
+  .tasks-list-pane .work-row[draggable="true"] { cursor: grab; }
+  .tasks-list-pane .work-row.dragging { opacity: 0.4; }
+  .task-group.drop-target { border-radius: 6px; transition: background 0.1s, box-shadow 0.1s; }
+  .task-group.drop-target.drop-on {
+    background: var(--accent-soft);
+    box-shadow: 0 0 0 2px var(--accent-line);
+  }
+
   /* Filter dropdown — replaces the desktop facet-rail; hidden on phone,
      which keeps its existing .filters-fab + bottom-sheet untouched. */
   .tasks-filter-wrap { position: relative; }
@@ -1260,8 +1269,16 @@
   .tasks-filter-trigger .chev { font-size: 10px; transition: transform 0.12s; }
   .tasks-filter-trigger.open .chev { transform: rotate(180deg); }
   .tasks-filter-scrim { position: fixed; inset: 0; z-index: 25; background: none; border: none; padding: 0; cursor: default; }
+  /* `fixed`, not `absolute` — the 3-pane workspace's list column
+     (.tasks-list-pane) clips overflow to keep its own scrollbar contained,
+     which was silently cutting this panel off at the pane edge instead of
+     letting it float over the rest of the app. Fixed positioning is placed
+     relative to the viewport, not any scrolling/clipping ancestor, so it
+     escapes that — top/left are computed in JS against the trigger's real
+     position (see tasks.js) since a fixed element can't be anchored with
+     `top: calc(100% + ...)` the way an absolute one could. */
   .tasks-filter-panel {
-    position: absolute; top: calc(100% + 8px); left: 0; z-index: 30; width: 270px;
+    position: fixed; z-index: 30; width: 270px;
     background: var(--surface-2); border: 1px solid var(--line-strong); border-radius: 7px;
     box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4); padding: 14px 0; max-height: 480px; overflow-y: auto;
   }
@@ -1345,6 +1362,287 @@
     main.tasks-shell .tasks-detail-empty { display: flex; align-items: center; justify-content: center; height: 100%; padding: 0 40px; }
 
     .tasks-filter-trigger { display: inline-flex; }
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     Calendar — day / week / 2 weeks / month.
+     Two grids: `.cal-tg` is the hour grid (day, week), `.cal-dg` is the
+     month-style cell grid (2 weeks, month). Chips are shared between them.
+     Colour comes from --chip, set per chip from the task's folder colour
+     (lib/domain-colors.js) or the accent for events, so the calendar reads
+     the same way the rest of the app does.
+     ═══════════════════════════════════════════════════════════════════════ */
+
+  /* The hour grid scrolls inside itself rather than scrolling the page, so
+     the day headers and the all-day strip stay put. That only works if the
+     calendar has a bounded height: body already reserves the bottom bar, so
+     the calendar takes what's left of the viewport. */
+  .cal { display: flex; flex-direction: column; min-height: 0; height: calc(100dvh - var(--nav-h) - env(safe-area-inset-bottom)); }
+
+  /* ── Header ──────────────────────────────────────────────────────────── */
+  .cal-head {
+    display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px;
+    padding: 18px 20px 12px;
+  }
+  .cal-head-left { flex: 1 1 200px; min-width: 0; }
+  .cal-head-left h1 {
+    margin: 3px 0 0; font-family: var(--serif); font-weight: 500;
+    font-size: 24px; letter-spacing: -0.015em; line-height: 1.15; color: var(--ink);
+  }
+  .cal-head-right { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+  .cal-navgroup { display: flex; align-items: center; border: 1px solid var(--line-strong); border-radius: 6px; overflow: hidden; }
+  .cal-nav, .cal-today {
+    background: none; border: none; cursor: pointer; color: var(--ink-2);
+    height: 32px; padding: 0 11px;
+  }
+  .cal-nav { font-size: 17px; line-height: 1; width: 34px; padding: 0; }
+  .cal-today { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.09em; border-inline: 1px solid var(--line); }
+  .cal-nav:hover, .cal-today:hover { background: var(--hover-wash); color: var(--ink); }
+
+  .cal-views { display: flex; border: 1px solid var(--line-strong); border-radius: 6px; overflow: hidden; }
+  .cal-viewbtn {
+    background: none; border: none; cursor: pointer; height: 32px; padding: 0 11px;
+    color: var(--ink-3); font-family: var(--mono); font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap;
+  }
+  .cal-viewbtn + .cal-viewbtn { border-left: 1px solid var(--line); }
+  .cal-viewbtn:hover { background: var(--hover-wash); color: var(--ink); }
+  .cal-viewbtn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+
+  .cal-unsched-btn {
+    height: 32px; padding: 0 11px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--line-strong); background: none; color: var(--ink-2);
+    font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .cal-unsched-btn:hover { border-color: var(--ink-3); color: var(--ink); }
+
+  /* ── Time grid ───────────────────────────────────────────────────────── */
+  /* One gutter column plus --cal-days equal day columns, declared once here
+     so the header row, the all-day strip and the body can never drift out of
+     alignment with each other. */
+  .cal-tg { display: flex; flex-direction: column; flex: 1; min-height: 0; border-top: 1px solid var(--line); }
+  .cal-tg-head, .cal-allday, .cal-tg-body {
+    display: grid;
+    grid-template-columns: var(--cal-gutter, 52px) repeat(var(--cal-days), minmax(0, 1fr));
+  }
+  .cal-tg-head { flex: 0 0 auto; border-bottom: 1px solid var(--line); background: var(--bg); }
+
+  .cal-gutter-cell { display: flex; align-items: center; justify-content: flex-end; padding-right: 7px; }
+  .cal-daycell {
+    display: flex; flex-direction: column; align-items: center; gap: 1px;
+    padding: 7px 2px 8px; background: none; border: none; border-left: 1px solid var(--line);
+    cursor: pointer; color: inherit;
+  }
+  .cal-daycell:hover { background: var(--hover-wash); }
+  .cal-daycell .dow { font-family: var(--mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--ink-3); }
+  .cal-daycell .dnum { font-family: var(--serif); font-size: 19px; line-height: 1.1; color: var(--ink); }
+  .cal-daycell.is-today .dow { color: var(--accent); }
+  .cal-daycell.is-today .dnum {
+    color: var(--bg); background: var(--accent); border-radius: 999px;
+    min-width: 26px; height: 26px; display: grid; place-items: center;
+  }
+
+  .cal-allday { flex: 0 0 auto; border-bottom: 1px solid var(--line-strong); min-height: 30px; max-height: 22vh; overflow-y: auto; }
+  .cal-allday .cal-gutter-cell { align-items: flex-start; padding-top: 7px; }
+  .cal-allday-cell { border-left: 1px solid var(--line); padding: 3px; display: flex; flex-direction: column; gap: 2px; min-height: 30px; }
+  .cal-allday-cell.is-today, .cal-col.is-today { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  .cal-tg-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+  .cal-gutter-hour {
+    display: flex; justify-content: flex-end; padding-right: 7px;
+    font-family: var(--mono); font-size: 9.5px; color: var(--ink-3);
+  }
+  /* The label sits ON the hour line, so it is nudged up half a line-height. */
+  .cal-gutter-hour span { transform: translateY(-6px); }
+
+  .cal-cols { display: grid; grid-template-columns: repeat(var(--cal-days), minmax(0, 1fr)); grid-column: 2 / -1; }
+  .cal-col { position: relative; border-left: 1px solid var(--line); }
+  .cal-hourlines {
+    position: absolute; inset: 0; pointer-events: none;
+    background-image: linear-gradient(to bottom, var(--line) 1px, transparent 1px);
+  }
+
+  .cal-now { position: absolute; left: 0; right: 0; height: 0; border-top: 1.5px solid var(--accent); z-index: 40; pointer-events: none; }
+  .cal-now-dot { position: absolute; left: -4px; top: -4px; width: 8px; height: 8px; border-radius: 999px; background: var(--accent); }
+
+  /* Sweep-to-create band. */
+  .cal-draw {
+    position: absolute; left: 2px; right: 4px; z-index: 45; pointer-events: none;
+    border: 1px dashed var(--accent-line); background: var(--accent-soft); border-radius: 4px;
+    padding: 3px 5px; font-family: var(--mono); font-size: 9.5px; color: var(--accent);
+  }
+
+  /* ── Chips ───────────────────────────────────────────────────────────── */
+  .cal-chip {
+    position: relative; min-width: 0; overflow: hidden; cursor: pointer;
+    border-radius: 4px; padding: 3px 6px;
+    border-left: 2.5px solid var(--chip);
+    background: color-mix(in srgb, var(--chip) 20%, var(--surface));
+    color: var(--ink);
+    /* Pointer-driven drag needs the gesture, not the browser's scrolling.
+       Scrolling still works everywhere else on the grid. */
+    touch-action: none;
+    -webkit-user-select: none; user-select: none;
+  }
+  .cal-chip:hover { background: color-mix(in srgb, var(--chip) 30%, var(--surface)); }
+  .cal-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .cal-chip.cal-timed { position: absolute; }
+  .cal-chip-time { font-family: var(--mono); font-size: 9px; letter-spacing: 0.04em; color: var(--ink-2); }
+  .cal-chip-title {
+    font-family: var(--sans); font-size: 12px; line-height: 1.3; font-weight: 500;
+    overflow: hidden; text-overflow: ellipsis; display: -webkit-box;
+    -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  }
+  .cal-chip-sub { font-family: var(--sans); font-size: 10.5px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* Anything under 30 minutes has room for one line only, laid out sideways. */
+  .cal-chip.is-short { display: flex; align-items: baseline; gap: 5px; padding-block: 1px; }
+  .cal-chip.is-short .cal-chip-title { -webkit-line-clamp: 1; white-space: nowrap; }
+  .cal-chip.is-compact { padding: 2px 5px; }
+  .cal-chip.is-compact .cal-chip-title { -webkit-line-clamp: 1; white-space: nowrap; font-size: 11.5px; }
+
+  .cal-chip.is-task { background: color-mix(in srgb, var(--chip) 13%, var(--surface)); }
+  .cal-chip.is-waiting { border-left-style: dashed; }
+  .cal-chip.is-done .cal-chip-title { text-decoration: line-through; color: var(--ink-3); }
+
+  /* Synced from elsewhere: hatched, and not draggable. The mark is the same
+     glyph the lock banner uses, so the two read as one idea. */
+  .cal-chip.is-locked {
+    cursor: default; border-left-style: double; border-left-width: 4px;
+    background-image: repeating-linear-gradient(135deg,
+      transparent 0 6px, color-mix(in srgb, var(--ink) 6%, transparent) 6px 7px);
+  }
+  .cal-lockmark { font-family: var(--mono); font-size: 9px; color: var(--ink-3); margin-right: 3px; }
+
+  .cal-resize {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 8px;
+    cursor: ns-resize; touch-action: none;
+  }
+  .cal-resize::after {
+    content: ''; position: absolute; left: 50%; bottom: 2px; width: 20px; height: 2px;
+    transform: translateX(-50%); border-radius: 2px; background: var(--chip); opacity: 0;
+  }
+  .cal-chip:hover .cal-resize::after { opacity: 0.7; }
+
+  .cal-chip.dragging { opacity: 0.3; }
+  .cal-chip.armed { box-shadow: 0 0 0 2px var(--accent-line); }
+  body.cal-dragging { cursor: grabbing; }
+  body.cal-dragging * { cursor: grabbing !important; }
+
+  /* The moving preview, positioned in viewport coordinates. */
+  .cal-ghost {
+    position: fixed; z-index: 300; pointer-events: none; border-radius: 4px;
+    padding: 3px 6px; overflow: hidden;
+    border: 1px solid var(--chip); border-left-width: 3px;
+    background: color-mix(in srgb, var(--chip) 34%, var(--surface));
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  }
+  .cal-ghost.is-loose { opacity: 0.6; }
+  .cal-ghost-time { font-family: var(--mono); font-size: 9px; color: var(--ink); }
+  .cal-ghost-title { font-family: var(--sans); font-size: 12px; font-weight: 500; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ── Day grid (2 weeks, month) ───────────────────────────────────────── */
+  .cal-dg { display: flex; flex-direction: column; flex: 1; border-top: 1px solid var(--line); min-height: 0; }
+  .cal-dg-head { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-bottom: 1px solid var(--line); }
+  .cal-dow {
+    padding: 6px 4px; text-align: center;
+    font-family: var(--mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--ink-3);
+  }
+  .cal-dg-body { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); flex: 1; min-height: 0; }
+  .cal-cell {
+    display: flex; flex-direction: column; min-width: 0; min-height: 0;
+    border-left: 1px solid var(--line); border-bottom: 1px solid var(--line);
+    padding: 3px 3px 5px;
+  }
+  .cal-cell:nth-child(7n + 1) { border-left: none; }
+  .cal-cell.is-outside { background: var(--hover-wash); }
+  .cal-cell.is-outside .cal-cell-num { color: var(--ink-4); }
+  .cal-cell.is-today { background: color-mix(in srgb, var(--accent) 5%, transparent); }
+  .cal-cell.drop-on, .cal-allday-cell.drop-on {
+    background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent-line);
+  }
+
+  .cal-cell-head { display: flex; align-items: center; gap: 4px; }
+  .cal-cell-num {
+    background: none; border: none; cursor: pointer; padding: 1px 4px; border-radius: 999px;
+    font-family: var(--mono); font-size: 10.5px; color: var(--ink-2);
+  }
+  .cal-cell-num:hover { background: var(--hover-wash); color: var(--ink); }
+  .cal-cell.is-today .cal-cell-num { background: var(--accent); color: var(--bg); font-weight: 600; }
+  .cal-cell-add {
+    margin-left: auto; background: none; border: none; cursor: pointer;
+    color: var(--ink-4); font-size: 14px; line-height: 1; padding: 0 3px; opacity: 0;
+  }
+  .cal-cell:hover .cal-cell-add { opacity: 1; }
+  .cal-cell-add:hover { color: var(--accent); }
+  .cal-cell-list { display: flex; flex-direction: column; gap: 2px; margin-top: 3px; overflow: hidden; }
+  .cal-more {
+    background: none; border: none; cursor: pointer; text-align: left; padding: 1px 5px;
+    font-family: var(--mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3);
+  }
+  .cal-more:hover { color: var(--accent); }
+
+  /* ── Sheets ──────────────────────────────────────────────────────────── */
+  .cal-sheet-body { padding: 14px 20px 24px; }
+  .cal-sheet-field { display: block; margin-bottom: 12px; }
+  .cal-sheet-field > span, .cal-sheet-times label > span {
+    display: block; margin-bottom: 4px;
+    font-family: var(--mono); font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3);
+  }
+  .cal-sheet-times { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .cal-sheet-check { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-family: var(--sans); font-size: 13px; color: var(--ink-2); }
+  .cal-sheet-check input { width: auto; min-height: 0; }
+  .cal-lockbanner {
+    margin-bottom: 14px; padding: 8px 10px; border-radius: 5px;
+    border: 1px solid var(--warn-line); background: var(--warn-soft);
+    font-family: var(--sans); font-size: 12px; color: var(--ink-2);
+  }
+  .cal-unsched-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--line); }
+  .cal-unsched-chip { flex: 1; min-width: 0; cursor: grab; }
+  .cal-unsched-actions { display: flex; gap: 6px; flex: 0 0 auto; }
+
+  /* ── Narrow ──────────────────────────────────────────────────────────── */
+  /* A seven-column hour grid is unusable at phone width, so Week scrolls
+     sideways rather than crushing every column to 40px. The view is still a
+     week — Next still pages a whole one — you just pan across it. */
+  @media (max-width: 640px) {
+    /* Three rows of chrome above a small grid is most of the screen, so the
+       title and the pager share a line and the view switch sits under them,
+       scrolling sideways rather than wrapping. */
+    .cal-head { padding: 12px 14px 8px; gap: 8px; align-items: center; }
+    .cal-head-left { flex: 1 1 auto; }
+    .cal-head-left h1 { font-size: 18px; }
+    .cal-head-left .eyebrow { display: none; }
+    .cal-head-right { flex: 1 1 100%; order: 3; gap: 6px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+    .cal-head-right::-webkit-scrollbar { display: none; }
+    .cal-navgroup { order: -1; flex: 0 0 auto; }
+    .cal-views, .cal-unsched-btn { flex: 0 0 auto; }
+    .cal-tg { --cal-gutter: 40px; }
+
+    /* A seventh of a phone screen is 53px. Two legible chips and a count beat
+       four ellipsised ones — and unlike dots, they stay big enough to drag. */
+    .cal-dg .cal-chip.is-compact { padding: 2px 4px; }
+    .cal-dg .cal-chip-title { font-size: 10px; }
+    .cal-week .cal-tg-head, .cal-week .cal-allday, .cal-week .cal-tg-scroll { overflow-x: auto; }
+    .cal-week .cal-tg-head, .cal-week .cal-allday, .cal-week .cal-tg-body {
+      grid-template-columns: var(--cal-gutter) repeat(var(--cal-days), minmax(96px, 1fr));
+    }
+    .cal-week .cal-cols { grid-template-columns: repeat(var(--cal-days), minmax(96px, 1fr)); }
+    .cal-cell { min-height: 74px; }
+    .cal-dg-body { grid-auto-rows: minmax(74px, 1fr); }
+    .cal-cell-add { opacity: 1; }
+    .cal-viewbtn { padding: 0 8px; }
+  }
+
+  @media (min-width: 800px) {
+    /* Full width and its own scroll, like the Tasks workspace — a calendar
+       inside the 1120px reading column wastes half a monitor. */
+    main.cal-shell { max-width: none; padding: 0; }
+    /* No bottom bar out here — the 60px topbar is the only chrome. */
+    main.cal-shell .cal { height: calc(100dvh - 60px); }
+    main.cal-shell .cal-head { padding: 20px 26px 14px; }
+    main.cal-shell .cal-head-left h1 { font-size: 28px; }
+    main.cal-shell .cal-dg-body { flex: 1; min-height: 0; }
   }
 </style>
 </head>

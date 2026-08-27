@@ -72,8 +72,32 @@ function groupOf(t, today_) {
   return t.status === 'waiting' ? 'Waiting' : dueInfo(t.due_date, today_).group;
 }
 
+// Mirrored from the Planner app (see scripts/sync-planner.mjs). The Planner
+// owns the title, date and time; the sync overwrites them here on its next
+// run, so anything in this file that would edit them has to refuse rather than
+// let the change appear to save and then silently revert 15 minutes later.
+// Completion is the exception — that syncs both ways on purpose.
+// `external_locked` is stronger: the job cannot be completed from Ops at all
+// (sprays need product, amount and withholding period logged in the Planner).
+const isPlanner = (t) => t?.external_source === 'planner';
+const isPlannerLocked = (t) => isPlanner(t) && !!t.external_locked;
+
 const GROUPS = ['Overdue', 'Today', 'Upcoming', 'No date', 'Waiting'];
-const VIEWS = [['all', 'All'], ['today', 'Today'], ['upcoming', 'Upcoming'], ['project', 'Project']];
+const VIEWS = [['all', 'All'], ['today', 'Today'], ['upcoming', 'Upcoming'], ['project', 'Project'], ['domain', 'Domain']];
+
+// What dragging a task onto each date-window group actually writes. Group
+// membership is otherwise derived (from due_date/status), so dropping onto
+// one has to pick a representative value — "the group" isn't a field. A
+// waiting task is always shown under Waiting regardless of due_date, so
+// every non-Waiting target also has to clear status back to 'open' or the
+// row would stay put despite the new date.
+const DATE_GROUP_PATCH = {
+  Overdue: () => ({ status: 'open', waiting_on: null, waiting_since: null, due_date: ymd(addDays(new Date(), -1)) }),
+  Today: () => ({ status: 'open', waiting_on: null, waiting_since: null, due_date: today() }),
+  Upcoming: () => ({ status: 'open', waiting_on: null, waiting_since: null, due_date: ymd(addDays(new Date(), 1)) }),
+  'No date': () => ({ status: 'open', waiting_on: null, waiting_since: null, due_date: null }),
+  Waiting: () => ({ status: 'waiting', waiting_since: today() }),
+};
 
 function fmtTime12(hm) {
   if (!hm) return '—';
@@ -307,7 +331,7 @@ export async function tasksList(mount) {
 
   const [tasksRes, projectsRes] = await Promise.all([
     sb.from('tasks').select(
-      'id, title, notes, status, due_date, due_time, priority, domain_id, project_id, milestone_id, content_item_id, waiting_on, waiting_since, completed_at, top3_for_date, created_at, source, recurrence_rule, reminder_offsets',
+      'id, title, notes, status, due_date, due_time, priority, domain_id, project_id, milestone_id, content_item_id, waiting_on, waiting_since, completed_at, top3_for_date, created_at, source, recurrence_rule, reminder_offsets, external_source, external_kind, external_url, external_locked',
     ),
     // ref.projects (loaded once for FK pickers app-wide) carries no
     // domain_id, so the domain/project grouped picker needs its own fetch —
@@ -397,6 +421,31 @@ export async function tasksList(mount) {
     renderDetail();
   }
 
+  // Drag-and-drop onto a group section — see DATE_GROUP_PATCH and the
+  // byProject/byDomain group builders in renderList for what `patch` is per
+  // target. A no-op drop (task dragged back onto its own group) skips the
+  // write entirely.
+  async function applyDrop(taskId, patch) {
+    const row = all.find((r) => r.id === taskId);
+    if (!row) return;
+    // Dropping a Planner job onto a date-window group would rewrite due_date
+    // (or push it into 'waiting'), both of which the sync resets from the
+    // Planner on its next run — so the row would jump back on its own a few
+    // minutes later. Regrouping by domain/project is fine: those are Ops-side
+    // and the sync never touches them.
+    if (isPlanner(row) && ('due_date' in patch || 'status' in patch)) {
+      toast('The Planner owns this job’s date — reschedule it there');
+      return;
+    }
+    if (Object.keys(patch).every((k) => (row[k] ?? null) === (patch[k] ?? null))) return;
+    const { error } = await sb.from('tasks').update(patch).eq('id', taskId);
+    if (error) { fail(error); return; }
+    Object.assign(row, patch);
+    toast('Moved');
+    renderList();
+    renderDetail();
+  }
+
   const rowCtx = {
     selectedId: () => selectedTaskId,
     onSelect: (id) => { if (isDesktop()) selectTask(id); else go(`#/tasks/${id}`); },
@@ -436,14 +485,45 @@ export async function tasksList(mount) {
         ? (a.waiting_since ?? a.created_at ?? '').localeCompare(b.waiting_since ?? b.created_at ?? '')
         : (a.due_date ?? '9999-99-99').localeCompare(b.due_date ?? '9999-99-99'));
 
-    const projectKey = (x) => refName('project', x.project_id) || `${refName('domain', x.domain_id) || 'Domain'} · direct`;
+    // Keyed by id (project_id, or a domain-direct bucket keyed by domain_id)
+    // rather than by display label — dragging a task onto a group needs a
+    // real id to write, and two domains/projects sharing a display name
+    // would otherwise collide.
+    const projectGroupKey = (x) => (x.project_id ? `p:${x.project_id}` : `d:${x.domain_id}`);
     const byProject = (() => {
       const m = new Map();
       for (const x of visible) {
-        const key = projectKey(x);
-        m.set(key, [...(m.get(key) ?? []), x]);
+        const key = projectGroupKey(x);
+        const entry = m.get(key);
+        if (entry) entry.tasks.push(x); else m.set(key, { tasks: [x] });
       }
-      return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+      const rows = [...m.entries()].map(([key, v]) => {
+        if (key.startsWith('p:')) {
+          const pid = key.slice(2);
+          const proj = projectsWithDomain.find((p) => p.id === pid);
+          return { label: proj?.name || '(project)', tasks: v.tasks, patch: { project_id: pid, domain_id: proj?.domain_id ?? null, milestone_id: null } };
+        }
+        const did = key.slice(2);
+        const label = `${refName('domain', did) || (did === ref.inbox?.id ? 'Inbox' : 'Domain')} · direct`;
+        return { label, tasks: v.tasks, patch: { project_id: null, domain_id: did, milestone_id: null } };
+      });
+      rows.sort((a, b) => a.label.localeCompare(b.label));
+      return rows;
+    })();
+
+    // Every domain (plus Inbox) shown even with zero tasks in view, not just
+    // the ones a visible task currently belongs to — otherwise there'd be no
+    // way to drag the last task *out* of a domain and still have somewhere
+    // to drag the next one back into it.
+    const byDomain = (() => {
+      const m = new Map();
+      for (const x of visible) m.set(x.domain_id, [...(m.get(x.domain_id) ?? []), x]);
+      const ids = new Set([ref.inbox?.id, ...ref.domains.map((d) => d.id)].filter(Boolean));
+      const rows = [...ids].map((id) => ({
+        id, label: refName('domain', id) || (id === ref.inbox?.id ? 'Inbox' : '(domain)'), tasks: m.get(id) ?? [],
+      }));
+      rows.sort((a, b) => a.label.localeCompare(b.label));
+      return rows;
     })();
 
     const counts = {
@@ -456,7 +536,8 @@ export async function tasksList(mount) {
       v === 'all' ? active.length
         : v === 'today' ? active.filter(isTodayOrOver).length
         : v === 'upcoming' ? active.filter(isUpcoming).length
-        : new Set(active.map(projectKey)).size;
+        : v === 'project' ? new Set(active.map(projectGroupKey)).size
+        : new Set(active.map((x) => x.domain_id)).size;
 
     // A function, not a value — the mobile Filters sheet and the desktop
     // dropdown each need their OWN DOM nodes (a node can only live in one
@@ -489,11 +570,16 @@ export async function tasksList(mount) {
     const sections = [];
     if (view === 'project') {
       if (!byProject.length) sections.push(emptyState(activeFilterCount > 0));
-      else for (const [label, ts] of byProject) sections.push(taskGroup(label, ts, t, renderList, false, rowCtx));
+      else for (const g of byProject) sections.push(taskGroup(g.label, g.tasks, t, renderList, false, rowCtx, { patch: g.patch, applyDrop }));
+    } else if (view === 'domain') {
+      for (const g of byDomain) sections.push(taskGroup(g.label, g.tasks, t, renderList, false, rowCtx, { patch: { domain_id: g.id, project_id: null, milestone_id: null }, applyDrop }));
+      if (!visible.length) sections.push(emptyState(activeFilterCount > 0));
     } else {
+      // Every date-window group is shown even when empty (unlike Project's
+      // buckets, there are only ever five of these) — otherwise there'd be
+      // nowhere to drop a task to make e.g. Waiting non-empty again.
       for (const g of groupsToShow) {
-        const ts = inGroup(g);
-        if (ts.length) sections.push(taskGroup(g, ts, t, renderList, g === 'Overdue', rowCtx));
+        sections.push(taskGroup(g, inGroup(g), t, renderList, g === 'Overdue', rowCtx, { patch: DATE_GROUP_PATCH[g](), applyDrop }));
       }
       if (!visible.length) sections.push(emptyState(activeFilterCount > 0));
     }
@@ -524,13 +610,34 @@ export async function tasksList(mount) {
       el('span', {}, activeFilterCount ? `${activeFilterCount} filter${activeFilterCount === 1 ? '' : 's'}` : 'All tasks'),
       el('span', { class: 'chev' }, '▾'),
     );
+    // Off-screen until the rAF below measures and places it — same trick as
+    // openContextMenu, so it doesn't flash at its unpositioned static spot
+    // for a frame first.
+    const filterPanel = filterOpen ? el('div', { class: 'tasks-filter-panel', style: 'left:-9999px' }, ...buildFacetGroups()) : null;
     const filterWrap = el('div', { class: 'tasks-filter-wrap' },
       filterTrigger,
       filterOpen ? el('div', {},
         el('button', { class: 'tasks-filter-scrim', type: 'button', 'aria-label': 'Close filters', onclick: () => { filterOpen = false; renderList(); } }),
-        el('div', { class: 'tasks-filter-panel' }, ...buildFacetGroups()),
+        filterPanel,
       ) : null,
     );
+    if (filterPanel) {
+      // `position: fixed` needs real pixel coordinates, computed against the
+      // trigger's actual position rather than a CSS `top: calc(100% + ...)`
+      // relative to a parent — that's what lets the panel float over the
+      // rest of the app instead of being clipped by .tasks-list-pane's
+      // `overflow: hidden`. Deferred a frame so the panel has its real
+      // width/height to clamp against.
+      requestAnimationFrame(() => {
+        if (!filterPanel.isConnected) return; // closed/re-rendered before this ran
+        const r = filterTrigger.getBoundingClientRect();
+        const p = filterPanel.getBoundingClientRect();
+        const left = Math.max(8, Math.min(r.left, window.innerWidth - p.width - 8));
+        const top = Math.max(8, Math.min(r.bottom + 8, window.innerHeight - p.height - 8));
+        filterPanel.style.left = `${left}px`;
+        filterPanel.style.top = `${top}px`;
+      });
+    }
 
     const head = el('header', { class: 'screen-head', style: 'padding-top:0' },
       el('div', { class: 'row-actions' },
@@ -735,14 +842,30 @@ function clearBtn(label, onClick) {
   return el('button', { class: 'linkish', type: 'button', style: 'font-family:var(--mono); font-size:9px; text-transform:uppercase; letter-spacing:0.09em; text-decoration:none', onclick }, label);
 }
 
-function taskGroup(label, tasks, t, refresh, accent, rowCtx) {
-  return el('section', { style: 'margin-bottom:22px' },
+// `drop` is `{ patch, applyDrop } | undefined` — omitted entirely means this
+// group isn't a valid drop target (e.g. Project view's buckets, which can't
+// cleanly reverse-map a display label back to an id — see byProject).
+function taskGroup(label, tasks, t, refresh, accent, rowCtx, drop) {
+  const section = el('section', { class: 'task-group', style: 'margin-bottom:22px' },
     el('div', { style: 'display:flex; align-items:baseline; justify-content:space-between; padding-bottom:8px; margin-bottom:4px; border-bottom:1px solid var(--line)' },
       el('h4', { class: 'eyebrow', style: 'margin:0' }, label),
       el('span', { class: 'eyebrow', style: accent ? 'color:var(--accent)' : '' }, String(tasks.length)),
     ),
     ...tasks.map((x) => taskListRow(x, t, refresh, rowCtx)),
   );
+  if (drop) {
+    section.classList.add('drop-target');
+    section.ondragover = (e) => e.preventDefault(); // required for ondrop to fire at all
+    section.ondragenter = () => section.classList.add('drop-on');
+    section.ondragleave = (e) => { if (!section.contains(e.relatedTarget)) section.classList.remove('drop-on'); };
+    section.ondrop = (e) => {
+      e.preventDefault();
+      section.classList.remove('drop-on');
+      const taskId = e.dataTransfer.getData('text/plain');
+      if (taskId) drop.applyDrop(taskId, drop.patch);
+    };
+  }
+  return section;
 }
 
 function emptyState(filtered) {
@@ -794,6 +917,11 @@ function taskListRow(x, t, refresh, rowCtx) {
     // not a fresh fetch. Reverts the fill if the write fails.
     onclick: async (e) => {
       e.stopPropagation();
+      if (isPlannerLocked(x)) {
+        toast('Log this one in the Planner');
+        if (x.external_url) window.open(x.external_url, '_blank', 'noreferrer');
+        return;
+      }
       check.disabled = true;
       check.style.background = 'var(--ink-2)';
       check.style.border = '2px solid var(--ink-2)';
@@ -825,6 +953,16 @@ function taskListRow(x, t, refresh, rowCtx) {
       el('span', { style: `width:7px; height:7px; border-radius:2px; background:${domainName ? domainColor(domainName) : '#B6AFA4'}` }),
       projectLabel));
   }
+  if (isPlanner(x)) {
+    bits.push(el('a', {
+      href: x.external_url || '#', target: '_blank', rel: 'noreferrer',
+      style: 'color:var(--ink-3); text-decoration:none',
+      title: isPlannerLocked(x)
+        ? 'From the Planner. Log it there — a spray record needs the product, amount and withholding period.'
+        : 'From the Planner. Tick it off here or there; its title and date belong to the Planner.',
+      onclick: (e) => e.stopPropagation(),
+    }, '⇄ Planner'));
+  }
   if (x.recurrence_rule) bits.push(el('span', { style: 'color:var(--ink-3)' }, `↻ ${x.recurrence_rule}`));
   if (x.reminder_offsets?.length) bits.push(el('span', { style: 'color:var(--ink-3)' }, 'remind'));
   if (x.content_item_id) bits.push(el('span', { style: 'color:var(--accent)' }, 'linked content'));
@@ -842,6 +980,17 @@ function taskListRow(x, t, refresh, rowCtx) {
   );
   rowCtx?.registerNode?.(x.id, row);
   row.oncontextmenu = (e) => taskContextMenu(e, x, refresh);
+
+  // Drag to another group section to change whatever field that group
+  // represents (due date/status for the date-window groups, domain/project
+  // for those views) — see taskGroup's `drop` param for the write side.
+  row.draggable = true;
+  row.ondragstart = (e) => {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', x.id);
+    row.classList.add('dragging');
+  };
+  row.ondragend = () => row.classList.remove('dragging');
   return row;
 }
 
@@ -1203,6 +1352,17 @@ export async function taskForm(mount, { id, inSheet } = {}) {
         ]),
     ...(isNew ? [] : [statusRow(row, id, mount)]),
     panel(
+      isPlanner(row) ? el('p', {
+        class: 'item-meta plain',
+        style: 'border:1px dashed var(--line); padding:8px 10px; line-height:1.5',
+      },
+        '⇄ From the Planner, which owns this job’s title, date and repeat — those are locked here. '
+        + 'Notes, priority, domain and reminders are yours. Ticking it off syncs both ways.',
+        row?.external_url ? el('a', {
+          href: row.external_url, target: '_blank', rel: 'noreferrer',
+          style: 'color:var(--ink-2); margin-left:6px',
+        }, 'Open in the Planner') : null,
+      ) : null,
       el('div', { class: 'field' }, el('label', {}, 'Title (required)'), title),
       el('div', { class: 'field' }, el('label', {}, 'Notes'), notes),
       el('div', { class: 'row' },
@@ -1224,12 +1384,31 @@ export async function taskForm(mount, { id, inSheet } = {}) {
     ),
   );
 
+  // Grey out what the Planner owns. Done here rather than at each element so
+  // it sits next to the payload strip in onSave and the two can't drift.
+  if (isPlanner(row)) {
+    for (const node of [title, dateInput, timeInput, recurSel]) {
+      if (!node) continue;
+      node.disabled = true;
+      node.style.opacity = '0.5';
+      node.title = 'The Planner owns this field.';
+    }
+  }
+
   async function onSave() {
     if (!v.title.trim()) { toast('Type something first.', 'err'); return; }
     save.disabled = true;
 
     const { payload, clearReminders } = buildTaskSavePayload(v, { row, isNew });
     if (clearReminders) payload.reminders_sent = {};
+
+    // The Planner owns these four; the sync rewrites them from the Planner on
+    // its next run. Drop them rather than reject the whole save — notes,
+    // priority, domain/project and reminders are Ops-side and should stick.
+    // The inputs are disabled too; this is the backstop.
+    if (isPlanner(row)) {
+      for (const k of ['title', 'due_date', 'due_time', 'recurrence_rule']) delete payload[k];
+    }
 
     const res = isNew
       ? await sb.from('tasks').insert(payload)

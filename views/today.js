@@ -117,7 +117,7 @@ function anchorLine(b) {
   if (b.events.length) {
     const e = b.nextEvent;
     parts.push(
-      el('button', { class: 'linkish', type: 'button', style: 'text-decoration:none', onclick: () => go('#/c/calendar') },
+      el('button', { class: 'linkish', type: 'button', style: 'text-decoration:none', onclick: () => go('#/calendar') },
         `${b.events.length} event${b.events.length === 1 ? '' : 's'} today`,
         e ? el('span', {}, ' — next ', el('b', {}, hhmm(new Date(e.start_at).toTimeString().slice(0, 5))), ` ${e.title}`) : null,
         '.',
@@ -341,7 +341,7 @@ function todaysEvents(b) {
   return el('section', { class: 'briefing-section' },
     el('div', { class: 'briefing-section-head' },
       el('span', { class: 'eyebrow' }, `Today · ${b.events.length} ${b.events.length === 1 ? 'event' : 'events'}`),
-      el('button', { class: 'linkish', type: 'button', style: 'text-decoration:none', onclick: () => go('#/c/calendar') }, 'Open →'),
+      el('button', { class: 'linkish', type: 'button', style: 'text-decoration:none', onclick: () => go('#/calendar') }, 'Open →'),
     ),
     b.nextEvent
       ? el('div', { class: 'briefing-event' },
@@ -351,7 +351,7 @@ function todaysEvents(b) {
         )
       : null,
     b.events.length > 1
-      ? el('button', { class: 'linkish', type: 'button', style: 'text-decoration:none; margin-top:6px; display:inline-block', onclick: () => go('#/c/calendar') },
+      ? el('button', { class: 'linkish', type: 'button', style: 'text-decoration:none; margin-top:6px; display:inline-block', onclick: () => go('#/calendar') },
           `+ ${b.events.length - 1} more →`)
       : null,
   );

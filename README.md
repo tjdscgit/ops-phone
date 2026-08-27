@@ -76,6 +76,8 @@ is what makes "edit, push, done" possible with no toolchain.
 | `lib/briefing.js` | Domain cadence + the Today briefing (ported from the API) |
 | `views/today.js` | Home screen: briefing, focus, attention, tasks, routines |
 | `views/tasks.js` | Task list and editor |
+| `views/calendar.js` | Day / week / 2 weeks / month grid, and the dragging |
+| `lib/calendar.js` | Calendar dates, item normalisation, overlap layout, patches |
 | `views/routines.js` | Daily tick list and streaks |
 | `views/capture.js` | One-screen quick capture |
 | `views/group.js` | Area index behind the Work / People / Library tabs |
@@ -105,8 +107,54 @@ at `#/c/notes`. Adding an area is a descriptor plus a line in `views/more.js`.
 **Removing one is deleting the descriptor** — which matters, because the plan
 here is to build broadly, find what actually gets used, and cut the rest.
 
-Only Today, Tasks and Routines are hand-written, because they act on rows
-(ticking, snoozing) rather than just opening them.
+Only Today, Tasks, Routines and the Calendar are hand-written, because they
+act on rows (ticking, snoozing, dragging) rather than just opening them.
+
+## The calendar
+
+`#/calendar/<view>/<date>` — day, week, 2 weeks, month. The view and the anchor
+date live in the path, so Back walks the weeks you actually looked at and a
+link to a particular day survives a reload. Keys: **D W F M** switch view,
+**T** jumps to today, **← →** page, **Z** undoes the last drag.
+
+It draws two tables at once. `calendar_events` are appointments. Tasks are on
+it too, because a task with `due_date` + `due_time` already *is* a thing with a
+place on a grid — timed tasks become blocks, dated-but-untimed tasks sit in the
+all-day strip, and tasks with no date at all wait in **Unscheduled** until you
+drag one in. Task blocks take their colour from the folder, the same colours
+the rest of the app uses.
+
+### The rule about dragging
+
+**The calendar never moves a row it doesn't own.** A task mirrored in from the
+Planner (`external_source = 'planner'`) and an event synced from Google are
+both written by a sync that would overwrite a local change on its next pass, so
+dragging them would quietly lose the edit. Those chips render hatched, open
+normally, and refuse to move — with the reason in the tooltip and in the header
+count. Reschedule them where they actually live.
+
+Everything else drags: move a block in time or across days, drag its bottom
+edge to resize, drag it to the all-day strip to drop the time, drag it across
+month cells to change the date while keeping the time of day. Sweep down an
+empty column to draw a new event. Every move writes immediately and says
+"Z to undo".
+
+Dragging is pointer events, not HTML5 drag-and-drop, which doesn't fire on
+touch at all. Mouse drags start after 4px of movement; touch drags need a 320ms
+hold first, so a scroll that begins on top of a chip is still a scroll.
+
+### Columns it would like but can live without
+
+Two migrations are written but **not applied** to the live project, and the
+calendar detects at runtime which columns exist (`detectColumns` in
+`lib/calendar.js`) rather than assuming:
+
+- **0046 `planner_sync`** — without it no task is ever planner-owned, so
+  nothing locks. Harmless; the lock logic is simply never triggered.
+- **0047 `tasks.duration_minutes`** — without it every timed task draws as a
+  30-minute block and drag-to-resize is off for tasks (events resize either
+  way, since they have a real `end_at`). Apply it when a task's real length
+  starts mattering.
 
 ## The briefing
 
