@@ -743,7 +743,9 @@ export async function tasksList(mount) {
             ? el('button', { class: 'ghost small', type: 'button', onclick: () => quickStatus(row, { status: 'open', waiting_on: null, waiting_since: null }) }, 'Back to open')
             : el('button', { class: 'ghost small', type: 'button', onclick: () => quickStatus(row, { status: 'waiting', waiting_since: today() }) }, 'Mark waiting'),
           row.status !== 'done'
-            ? el('button', { class: 'ghost small', type: 'button', onclick: () => quickStatus(row, { status: 'done', completed_at: new Date().toISOString() }) }, 'Complete')
+            ? (isPlannerLocked(row)
+              ? el('a', { class: 'ghost small', href: row.external_url || '#', target: '_blank', rel: 'noreferrer' }, 'Log in Planner ↗')
+              : el('button', { class: 'ghost small', type: 'button', onclick: () => quickStatus(row, { status: 'done', completed_at: new Date().toISOString() }) }, 'Complete'))
             : null,
           el('button', { class: 'detail-btn solid', type: 'button', onclick: () => startEdit() }, 'Edit'),
         ),
@@ -1107,7 +1109,9 @@ function taskContextMenu(evt, task, refresh) {
   const statusItems = isDone
     ? [menuItem('↺ Reopen', () => patch({ status: 'open', completed_at: null }, 'Reopened'))]
     : [
-        menuItem('✓ Complete', () => patch({ status: 'done', completed_at: new Date().toISOString() }, 'Done')),
+        isPlannerLocked(task)
+          ? menuItem('↗ Log in Planner', () => window.open(task.external_url || '#', '_blank', 'noopener'))
+          : menuItem('✓ Complete', () => patch({ status: 'done', completed_at: new Date().toISOString() }, 'Done')),
         isWaiting
           ? menuItem('▸ Back to open', () => patch({ status: 'open', waiting_on: null, waiting_since: null }, 'Reopened'))
           : menuItem('⏸ Mark waiting', () => patch({ status: 'waiting', waiting_since: today() }, 'Marked waiting')),
@@ -1206,6 +1210,11 @@ export function taskRow(t, refresh, opts = {}) {
     // right state. Reverts the fill if the write fails.
     onClick: async (e) => {
       e.stopPropagation();
+      if (!done && isPlannerLocked(t)) {
+        toast('Log this one in the Planner');
+        if (t.external_url) window.open(t.external_url, '_blank', 'noreferrer');
+        return;
+      }
       const patch = done
         ? { status: 'open', completed_at: null }
         : { status: 'done', completed_at: new Date().toISOString() };
