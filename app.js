@@ -29,6 +29,7 @@ import {
 import { projectDetail, projectNew } from './views/projects.js';
 import { domainDetail } from './views/domains.js';
 import { calendarView } from './views/calendar.js';
+import { askView } from './views/ask.js';
 
 // ─── Routes ──────────────────────────────────────────────────────────────
 
@@ -39,6 +40,7 @@ route('/settings', settingsView);
 route('/attention', attentionView);
 route('/notifications', notificationsView);
 route('/search', searchView);
+route('/chat', askView);
 
 // Calendar. The view and the anchor date live in the path rather than in
 // module state so Back walks the weeks actually looked at, and a link to a
@@ -156,6 +158,8 @@ const ICONS = {
   library: '<path d="M4 4.5v15l3 .5V5.5z"/><path d="M10 4.5v15l3 .5V5.5z"/><path d="M16.2 5.8l3 14.7 1.5-.4-3-14.7z"/>',
   routines: '<path d="M4.5 9.5a7.5 7.5 0 0113-4.2M19.5 14.5a7.5 7.5 0 01-13 4.2"/><path d="M4.5 5.5v4h4M19.5 18.5v-4h-4"/>',
   search: '<circle cx="11" cy="11" r="7"/><path d="M16.2 16.2L21 21"/>',
+  // "Ask" / chat. Copied verbatim from apps/web/src/components/Icon.tsx.
+  ask: '<path d="M20.5 12.5c0 3.6-3.8 6.5-8.5 6.5-1 0-2-.13-2.9-.37L4 20.5l1.3-3.4A6.9 6.9 0 013.5 12.5C3.5 8.9 7.3 6 12 6s8.5 2.9 8.5 6.5z"/>',
   capture: '<path d="M12 5v14M5 12h14"/>',
   bell: '<path d="M12 4a5.5 5.5 0 00-5.5 5.5c0 4-1.5 5.5-1.5 5.5h14s-1.5-1.5-1.5-5.5A5.5 5.5 0 0012 4zM10.2 18.5a2 2 0 003.6 0"/>',
   flag: '<path d="M6 21V4.5M6 4.5h11l-2 3.5 2 3.5H6"/>',
@@ -176,6 +180,7 @@ const TABS = [
 // highlights on Tasks, Routines, Notes, Settings and the rest.
 const MORE_ITEMS = [
   { href: '#/tasks', label: 'Tasks', glyph: '☰' },
+  { href: '#/chat', label: 'Ask', glyph: '?' },
   { href: '#/routines', label: 'Routines', glyph: '↻' },
   { href: '#/c/captured', label: 'Inbox', glyph: '⬚' },
   { href: '#/calendar', label: 'Calendar', glyph: '▤' },
@@ -283,6 +288,7 @@ function buildRail() {
     el('div', { class: 'rail-foot' },
       item({ label: 'Capture', icon: 'capture', onClick: () => go('#/capture') }),
       item({ href: '#/search', label: 'Search', icon: 'search' }),
+      item({ href: '#/chat', label: 'Ask', icon: 'ask' }),
       item({ href: '#/attention', label: 'Attention', icon: 'flag', badge: attnBadge }),
       item({ href: '#/notifications', label: 'Notifications', icon: 'bell', badge: notifBadge, badgeAccent: true }),
       item({ href: '#/settings', label: 'Settings', icon: 'gear' }),
@@ -335,6 +341,7 @@ const CRUMBS = {
   settings: { label: 'Settings' },
   search: { label: 'Search' },
   capture: { label: 'Capture' },
+  chat: { label: 'Ask' },
 };
 const CRUMB_BY_KEY = {
   content: { label: 'Content', sub: 'Pipeline' },

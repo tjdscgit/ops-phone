@@ -889,6 +889,40 @@
   .panel .hint, .field .hint { padding: 8px 0 0; }
   .hidden { display: none !important; }
 
+  /* ── Ask ──────────────────────────────────────────────────────────────── */
+  .ask-input-row { display: flex; gap: 10px; align-items: flex-end; }
+  .ask-input-row textarea { flex: 1; margin: 0; }
+  .ask-input-row button.primary { flex: 0 0 auto; height: 40px; }
+  .ask-toolbar {
+    display: flex; align-items: center; justify-content: flex-end;
+    margin-top: 8px;
+  }
+  .ask-thread { padding: 4px 20px 24px; display: flex; flex-direction: column; gap: 20px; }
+  .ask-turn { display: flex; flex-direction: column; gap: 10px; }
+  .ask-turn-row { display: flex; gap: 12px; align-items: flex-start; }
+  .ask-turn-who {
+    flex: 0 0 44px; padding-top: 2px;
+    font-family: var(--mono); font-size: 10px; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--ink-3);
+  }
+  .ask-turn-body {
+    flex: 1; min-width: 0;
+    font-family: var(--sans); font-size: 14px; line-height: 1.55; color: var(--ink);
+    white-space: pre-wrap;
+  }
+  .ask-answer { white-space: pre-wrap; }
+  .ask-error { color: var(--accent); }
+  .ask-tools { margin-top: 6px; }
+  .ask-tools summary {
+    font-family: var(--mono); font-size: 10px; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--ink-3); cursor: pointer; list-style: none;
+  }
+  .ask-tools summary::-webkit-details-marker { display: none; }
+  .ask-tools ul { margin: 6px 0 0; padding: 0; list-style: none; }
+  .ask-tools li {
+    font-family: var(--mono); font-size: 10px; line-height: 1.6; color: var(--ink-3);
+  }
+
   /* ── Capture FAB ─────────────────────────────────────────────────────── */
   /* Capture is an action available everywhere, not a destination — so it
      floats above the bar rather than spending one of the five tab slots. */
@@ -1438,6 +1472,15 @@
     display: grid;
     grid-template-columns: var(--cal-gutter, 52px) repeat(var(--cal-days), minmax(0, 1fr));
   }
+  /* The scrolling hour body loses width to its own scrollbar; this row
+     does not scroll, so without reserving the same width its 7 equal
+     columns divide a slightly wider space than the body's do, a drift
+     that compounds column by column (confirmed: 0px on Monday, 13px by
+     Sunday). --cal-sb-width is measured once in calendar.js; scrollbar-
+     gutter: stable on .cal-tg-scroll below makes the reservation apply
+     consistently whether or not a scrollbar is actually visible (Fit to
+     page can make the body exactly fill its box with nothing to scroll). */
+  .cal-tg-head, .cal-allday { padding-right: var(--cal-sb-width, 0px); }
   .cal-tg-head { flex: 0 0 auto; border-bottom: 1px solid var(--line); background: var(--bg); }
 
   .cal-gutter-cell { display: flex; align-items: center; justify-content: flex-end; padding-right: 7px; }
@@ -1460,20 +1503,38 @@
   .cal-allday-cell { border-left: 1px solid var(--line); padding: 3px; display: flex; flex-direction: column; gap: 2px; min-height: 30px; }
   .cal-allday-cell.is-today, .cal-col.is-today { background: color-mix(in srgb, var(--accent) 4%, transparent); }
 
-  .cal-tg-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+  .cal-tg-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+
+  /* Each label sits at the same rounded pixel offset the matching hour line
+     in every column uses (hourTop() in calendar.js) — absolutely positioned
+     rather than stacked block rows, so nothing here can drift out of step
+     with the grid the way 24 independently-rounded row heights would. */
+  .cal-gutter { position: relative; }
   .cal-gutter-hour {
-    display: flex; justify-content: flex-end; padding-right: 7px;
+    position: absolute; right: 7px; transform: translateY(-6px);
     font-family: var(--mono); font-size: 9.5px; color: var(--ink-3);
   }
-  /* The label sits ON the hour line, so it is nudged up half a line-height. */
-  .cal-gutter-hour span { transform: translateY(-6px); }
 
-  .cal-cols { display: grid; grid-template-columns: repeat(var(--cal-days), minmax(0, 1fr)); grid-column: 2 / -1; }
+  /* Not its own grid. `.cal-tg-head`, `.cal-allday` and `.cal-tg-body` each
+     declare the same gutter+N-days template independently, and even with an
+     identical declaration two separate CSS Grid contexts can round each
+     track's width to a different whole pixel — the difference compounds
+     column by column and was visibly off by double digits of pixels by the
+     last day of the week. `display: contents` removes `.cal-cols` from
+     layout entirely, so its `.cal-col` children become direct items of
+     `.cal-tg-body`'s own grid (auto-placed right after the gutter cell,
+     same as the header's day cells) — one grid computing the boundaries
+     once, used by both rows, so there is nothing left to disagree. */
+  .cal-cols { display: contents; }
   .cal-col { position: relative; border-left: 1px solid var(--line); }
-  .cal-hourlines {
-    position: absolute; inset: 0; pointer-events: none;
-    background-image: linear-gradient(to bottom, var(--line) 1px, transparent 1px);
-  }
+  .cal-hourlines { position: absolute; inset: 0; pointer-events: none; }
+  /* One element per hour boundary, each at its own rounded top offset,
+     rather than a single repeating background tiled at a fractional
+     background-size — that tiling drifted a little further off with every
+     row (each browser re-rounds every tile independently), and drifted by a
+     different amount in every column, which is what made the gridlines
+     visibly misaligned column-to-column under Fit to page. */
+  .cal-hourline { position: absolute; left: 0; right: 0; height: 1px; background: var(--line); }
 
   .cal-now { position: absolute; left: 0; right: 0; height: 0; border-top: 1.5px solid var(--accent); z-index: 40; pointer-events: none; }
   .cal-now.hidden { display: none; }
@@ -1640,7 +1701,8 @@
     .cal-week .cal-tg-head, .cal-week .cal-allday, .cal-week .cal-tg-body {
       grid-template-columns: var(--cal-gutter) repeat(var(--cal-days), minmax(96px, 1fr));
     }
-    .cal-week .cal-cols { grid-template-columns: repeat(var(--cal-days), minmax(96px, 1fr)); }
+    /* No longer needed: .cal-cols has no grid of its own to override — the
+       .cal-tg-body rule two lines up already governs its promoted children. */
     .cal-cell { min-height: 74px; }
     .cal-dg-body { grid-auto-rows: minmax(74px, 1fr); }
     .cal-cell-add { opacity: 1; }
